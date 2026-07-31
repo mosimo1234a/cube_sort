@@ -10,6 +10,10 @@
             overflow: hidden;
             background-color: #222;
             font-family: 'Arial', sans-serif;
+            cursor: grab;
+        }
+        body:active {
+            cursor: grabbing;
         }
         #instructions {
             position: absolute;
@@ -36,30 +40,44 @@
             justify-content: center;
             align-items: center;
             z-index: 10;
+            cursor: default;
         }
         .modal-box {
             background: white;
-            padding: 40px;
+            padding: 30px 40px;
             border-radius: 20px;
             text-align: center;
             box-shadow: 0 10px 30px rgba(0,0,0,0.5);
             width: 300px;
         }
         .modal-box h2 { margin-top: 0; color: #333; }
-        .modal-box input {
-            width: 80%; padding: 12px;
+        .modal-box input[type="text"] {
+            width: 80%; padding: 10px;
             font-size: 16px; border: 2px solid #ddd;
-            border-radius: 8px; margin-bottom: 20px;
+            border-radius: 8px; margin-bottom: 15px;
             text-align: center; outline: none;
         }
-        .modal-box input:focus { border-color: #ffd700; }
+        .modal-box input[type="text"]:focus { border-color: #ffd700; }
+        .color-picker-wrapper {
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            font-size: 14px;
+            color: #555;
+        }
+        .modal-box input[type="color"] {
+            width: 40px; height: 35px;
+            border: none; border-radius: 6px;
+            cursor: pointer; background: none;
+        }
         .modal-box button {
             width: 100%; padding: 12px;
             font-size: 16px; background: #ffd700;
             border: none; border-radius: 8px;
             cursor: pointer; font-weight: bold; color: #333;
         }
-        /* 닉네임 뱃지 공통 스타일 */
         .name-tag {
             position: absolute;
             color: white;
@@ -74,22 +92,25 @@
             display: none;
             box-shadow: 0 2px 4px rgba(0,0,0,0.3);
         }
-        .my-tag { background: rgba(255, 165, 0, 0.8); } /* 내 닉네임은 주황색 */
+        .my-tag { background: rgba(255, 165, 0, 0.85); }
     </style>
 </head>
 <body>
     <div id="start-screen">
         <div class="modal-box">
             <h2>✨ 멀티 네모 모험 ✨</h2>
-            <p style="color: #666; font-size: 14px; margin-bottom: 20px;">닉네임을 입력하고 멀티에 접속하세요!</p>
+            <p style="color: #666; font-size: 14px; margin-bottom: 15px;">정보를 입력하고 접속하세요!</p>
             <input type="text" id="nickname-input" value="귀여운네모" maxlength="10">
-            <br>
+            <div class="color-picker-wrapper">
+                <label for="color-input">내 네모 색상:</label>
+                <input type="color" id="color-input" value="#ffd700">
+            </div>
             <button id="start-btn">멀티 접속하기</button>
         </div>
     </div>
 
     <div id="instructions">
-        <strong>WASD</strong> / <strong>방향키</strong>: 이동 | <strong>SPACEBAR</strong>: 점프
+        <strong>WASD / 방향키</strong>: 이동 | <strong>SPACE</strong>: 점프 | <strong>마우스 드래그</strong>: 시점 회전
     </div>
 
     <div id="my-name-tag" class="name-tag my-tag"></div>
@@ -100,15 +121,16 @@
     <script>
         let gameStarted = false;
         let socket;
-        const otherPlayers = {}; // 다른 플레이어 저장 객체
+        const otherPlayers = {};
 
         const startScreen = document.getElementById('start-screen');
         const startBtn = document.getElementById('start-btn');
         const nicknameInput = document.getElementById('nickname-input');
+        const colorInput = document.getElementById('color-input');
         const instructions = document.getElementById('instructions');
         const myNameTag = document.getElementById('my-name-tag');
 
-        // 1. 씬, 카메라, 렌더러 설정
+        // 3D 씬 설정
         const scene = new THREE.Scene();
         scene.background = new THREE.Color(0x87ceeb);
         scene.fog = new THREE.Fog(0x87ceeb, 25, 60);
@@ -120,10 +142,7 @@
         renderer.outputEncoding = THREE.sRGBEncoding;
         document.body.appendChild(renderer.domElement);
 
-        // 조명 및 바닥
-        const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
-        scene.add(ambientLight);
-
+        scene.add(new THREE.AmbientLight(0xffffff, 0.7));
         const directionalLight = new THREE.DirectionalLight(0xffffff, 0.9);
         directionalLight.position.set(15, 25, 10);
         directionalLight.castShadow = true;
@@ -137,15 +156,13 @@
         floor.receiveShadow = true;
         scene.add(floor);
 
-        // 메시 생성용 재료 공유
         const bodyGeo = new THREE.BoxGeometry(1.5, 1.5, 1.5);
         const eyeGeo = new THREE.BoxGeometry(0.18, 0.18, 0.05);
         const eyeMat = new THREE.MeshBasicMaterial({ color: 0x222222 });
 
-        // 내 플레이어 메쉬 생성 함수
-        function createPlayerMesh(color = 0xffd700) {
+        function createPlayerMesh(colorHex = '#ffd700') {
             const group = new THREE.Group();
-            const bodyMat = new THREE.MeshStandardMaterial({ color, roughness: 0.3 });
+            const bodyMat = new THREE.MeshStandardMaterial({ color: colorHex, roughness: 0.3 });
             const body = new THREE.Mesh(bodyGeo, bodyMat);
             body.position.y = 0.75;
             body.castShadow = true;
@@ -162,42 +179,60 @@
             return { group, body };
         }
 
-        const myPlayer = createPlayerMesh(0xffd700);
-        scene.add(myPlayer.group);
-
-        // 플레이어 동작 변수
-        const playerVelocity = new THREE.Vector3();
+        let myPlayer;
+        let playerVelocity = new THREE.Vector3();
         const playerSpeed = 0.15;
         const gravity = 0.02;
         const jumpForce = 0.4;
         let isGrounded = false;
         const keys = { forward: false, backward: false, left: false, right: false };
 
-        // 2. 소켓 통신 연결
+        // 카메라 및 마우스 회전 변수
+        let cameraAngleX = 0;
+        let cameraAngleY = 0.4;
+        let isDragging = false;
+        let previousMousePosition = { x: 0, y: 0 };
+
+        window.addEventListener('mousedown', (e) => {
+            if (!gameStarted) return;
+            isDragging = true;
+            previousMousePosition = { x: e.clientX, y: e.clientY };
+        });
+
+        window.addEventListener('mousemove', (e) => {
+            if (!gameStarted || !isDragging) return;
+            const deltaX = e.clientX - previousMousePosition.x;
+            const deltaY = e.clientY - previousMousePosition.y;
+
+            cameraAngleX -= deltaX * 0.005;
+            cameraAngleY = Math.max(0.05, Math.min(1.4, cameraAngleY + deltaY * 0.005));
+
+            previousMousePosition = { x: e.clientX, y: e.clientY };
+        });
+
+        window.addEventListener('mouseup', () => { isDragging = false; });
+
         startBtn.addEventListener('click', () => {
             const nickname = nicknameInput.value.trim() || '네모';
+            const selectedColor = colorInput.value;
             myNameTag.innerText = nickname;
 
+            myPlayer = createPlayerMesh(selectedColor);
+            scene.add(myPlayer.group);
+
             socket = io();
+            socket.emit('joinGame', { nickname, color: selectedColor });
 
-            // 게임 입장 알림
-            socket.emit('joinGame', { nickname });
-
-            // 기존 플레이어들 생성
             socket.on('currentPlayers', (players) => {
                 Object.keys(players).forEach((id) => {
-                    if (id !== socket.id) {
-                        addOtherPlayer(players[id]);
-                    }
+                    if (id !== socket.id) addOtherPlayer(players[id]);
                 });
             });
 
-            // 신규 플레이어 추가
             socket.on('newPlayer', (playerData) => {
                 addOtherPlayer(playerData);
             });
 
-            // 플레이어 이동 업데이트
             socket.on('playerMoved', (playerData) => {
                 if (otherPlayers[playerData.id]) {
                     otherPlayers[playerData.id].group.position.set(playerData.x, playerData.y, playerData.z);
@@ -205,7 +240,6 @@
                 }
             });
 
-            // 플레이어 퇴장 처리
             socket.on('playerDisconnected', (id) => {
                 if (otherPlayers[id]) {
                     scene.remove(otherPlayers[id].group);
@@ -221,7 +255,7 @@
         });
 
         function addOtherPlayer(playerData) {
-            const remoteMesh = createPlayerMesh(0x6bdaff); // 타인은 하늘색 네모
+            const remoteMesh = createPlayerMesh(playerData.color || '#6bdaff');
             remoteMesh.group.position.set(playerData.x, playerData.y, playerData.z);
             scene.add(remoteMesh.group);
 
@@ -230,13 +264,9 @@
             tag.innerText = playerData.nickname;
             document.body.appendChild(tag);
 
-            otherPlayers[playerData.id] = {
-                group: remoteMesh.group,
-                tag: tag
-            };
+            otherPlayers[playerData.id] = { group: remoteMesh.group, tag: tag };
         }
 
-        // 키 입력을 처리합니다.
         window.addEventListener('keydown', (e) => {
             if (!gameStarted) return;
             if (e.code === 'KeyW' || e.code === 'ArrowUp') keys.forward = true;
@@ -259,21 +289,24 @@
 
         const tempVector = new THREE.Vector3();
 
-        // 3. 메인 게임 루프
         function animate() {
             requestAnimationFrame(animate);
 
-            if (gameStarted) {
-                let moveX = 0;
-                let moveZ = 0;
+            if (gameStarted && myPlayer) {
+                let moveForward = 0;
+                let moveRight = 0;
 
-                if (keys.forward) moveZ -= 1;
-                if (keys.backward) moveZ += 1;
-                if (keys.left) moveX -= 1;
-                if (keys.right) moveX += 1;
+                if (keys.forward) moveForward += 1;
+                if (keys.backward) moveForward -= 1;
+                if (keys.left) moveRight -= 1;
+                if (keys.right) moveRight += 1;
 
-                if (moveX !== 0 || moveZ !== 0) {
-                    const targetAngle = Math.atan2(moveX, moveZ);
+                if (moveForward !== 0 || moveRight !== 0) {
+                    // 카메라 시점을 기준으로 이동 방향 계산
+                    const dirX = Math.sin(cameraAngleX) * moveForward + Math.cos(cameraAngleX) * moveRight;
+                    const dirZ = Math.cos(cameraAngleX) * moveForward - Math.sin(cameraAngleX) * moveRight;
+
+                    const targetAngle = Math.atan2(dirX, dirZ);
                     let currentAngle = myPlayer.group.rotation.y;
                     let angleDiff = targetAngle - currentAngle;
                     
@@ -281,11 +314,10 @@
                     while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
                     myPlayer.group.rotation.y += angleDiff * 0.15;
 
-                    myPlayer.group.position.x += moveX * playerSpeed;
-                    myPlayer.group.position.z += moveZ * playerSpeed;
+                    myPlayer.group.position.x += dirX * playerSpeed;
+                    myPlayer.group.position.z += dirZ * playerSpeed;
                     myPlayer.body.position.y = 0.75 + Math.abs(Math.sin(Date.now() * 0.015)) * 0.2;
 
-                    // 내 위치 서버로 전송
                     socket.emit('playerUpdate', {
                         x: myPlayer.group.position.x,
                         y: myPlayer.group.position.y,
@@ -296,7 +328,6 @@
                     myPlayer.body.position.y = 0.75;
                 }
 
-                // 점프/중력
                 playerVelocity.y -= gravity;
                 myPlayer.group.position.y += playerVelocity.y;
 
@@ -306,18 +337,17 @@
                     isGrounded = true;
                 }
 
-                // 내 카메라 추적
-                camera.position.lerp(new THREE.Vector3(
-                    myPlayer.group.position.x,
-                    myPlayer.group.position.y + 4,
-                    myPlayer.group.position.z + 7
-                ), 0.1);
+                // 마우스 회전 각도에 따른 3인칭 카메라 위치 계산
+                const distance = 7;
+                const targetCamX = myPlayer.group.position.x + Math.sin(cameraAngleX) * distance * Math.cos(cameraAngleY);
+                const targetCamY = myPlayer.group.position.y + 2 + Math.sin(cameraAngleY) * distance;
+                const targetCamZ = myPlayer.group.position.z + Math.cos(cameraAngleX) * distance * Math.cos(cameraAngleY);
+
+                camera.position.lerp(new THREE.Vector3(targetCamX, targetCamY, targetCamZ), 0.15);
                 camera.lookAt(myPlayer.group.position.x, myPlayer.group.position.y + 1, myPlayer.group.position.z);
 
-                // 내 닉네임 위치 동기화
                 updateTagPosition(myPlayer.group, myNameTag, 1.8);
 
-                // 다른 플레이어들 닉네임 위치 동기화
                 Object.keys(otherPlayers).forEach(id => {
                     updateTagPosition(otherPlayers[id].group, otherPlayers[id].tag, 1.8);
                 });
