@@ -53,20 +53,22 @@
             position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%);
             background: rgba(15, 15, 15, 0.95); padding: 20px; border-radius: 15px;
             color: white; display: none; text-align: center; z-index: 5;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.7); border: 2px solid #e67e22; width: 400px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.7); border: 2px solid #e67e22; width: 420px;
         }
-        .num-btn {
-            padding: 10px 15px; margin: 5px; background: #34495e; color: white;
-            border: none; border-radius: 8px; font-size: 18px; font-weight: bold; cursor: pointer;
+        .sort-btn {
+            padding: 12px 18px; margin: 5px; background: #34495e; color: white;
+            border: 2px solid #4e6d8c; border-radius: 8px; font-size: 18px; font-weight: bold; cursor: pointer;
+            transition: all 0.2s;
         }
-        .num-btn:hover { background: #2980b9; }
+        .sort-btn:hover { background: #2980b9; border-color: #3498db; }
+        .sort-btn.selected { background: #e67e22; border-color: #f39c12; }
     </style>
 </head>
 <body>
     <div id="start-screen">
         <div class="modal-box">
             <h2>🔐 알고리즘 방탈출</h2>
-            <p style="color: #666; font-size: 13px; margin-bottom: 15px;">협동하여 정렬 퍼즐을 풀고 탈출하세요!</p>
+            <p style="color: #666; font-size: 13px; margin-bottom: 15px;">협동하여 정렬 규칙 퍼즐을 풀고 탈출하세요!</p>
             <input type="text" id="room-input" value="알고리즘1방" placeholder="방 이름">
             <input type="text" id="nickname-input" value="개발자네모" maxlength="10" placeholder="닉네임">
             <div class="color-picker-wrapper">
@@ -78,19 +80,17 @@
     </div>
 
     <div id="instructions">
-        <strong>마우스 드래그</strong>: 자유 시점 회전 | <strong>WASD</strong>: 이동 | <strong>SPACE</strong>: 점프<br>
+        <strong>마우스 드래그</strong>: 자유 시점 회전 | <strong>WASD</strong>: 이동 (정방향 일치)<br>
         협동 스위치 2개를 모두 밟아야 콘솔이 활성화됩니다!
     </div>
 
     <div id="puzzle-ui">
-        <h3 id="puzzle-title" style="margin:0 0 8px 0; color:#f1c40f;">정렬 알고리즘 퍼즐</h3>
-        <p id="puzzle-desc" style="font-size:12px; color:#bbb; margin:0 0 10px 0;">주어진 숫자를 오름차순으로 정렬하세요!</p>
-        <div style="font-size:14px; color:#ddd; margin-bottom:5px;">현재 배열: <span id="target-nums" style="color:#2ecc71; font-weight:bold;">[ ? ]</span></div>
-        <div style="font-size:14px; color:#ddd; margin-bottom:12px;">내가 고른 순서: <span id="user-seq" style="color:#e74c3c; font-weight:bold;">[ 없음 ]</span></div>
-        <div id="number-buttons"></div>
-        <div style="margin-top: 15px;">
-            <button onclick="submitPuzzle()" style="background:#27ae60; color:white; padding:8px 16px; border:none; border-radius:6px; cursor:pointer; font-weight:bold;">제출</button>
-            <button onclick="resetPuzzle()" style="background:#c0392b; color:white; padding:8px 16px; border:none; border-radius:6px; cursor:pointer; font-weight:bold;">리셋</button>
+        <h3 id="puzzle-title" style="margin:0 0 6px 0; color:#f1c40f;">정렬 알고리즘 퍼즐</h3>
+        <p id="puzzle-desc" style="font-size:12px; color:#bbb; margin:0 0 12px 0; line-height: 1.4;">규칙에 맞춰 정렬하세요!</p>
+        <div id="number-container" style="margin-bottom: 15px;"></div>
+        <div>
+            <button onclick="submitPuzzle()" style="background:#27ae60; color:white; padding:8px 16px; border:none; border-radius:6px; cursor:pointer; font-weight:bold;">정답 제출</button>
+            <button onclick="resetPuzzle()" style="background:#c0392b; color:white; padding:8px 16px; border:none; border-radius:6px; cursor:pointer; font-weight:bold;">초기화</button>
         </div>
     </div>
 
@@ -104,8 +104,9 @@
         let socket;
         let roomSolved = false;
         let puzzleData = { type: 'bubble', numbers: [3,1,4,2], answer: [1,2,3,4] };
+        let currentArray = [];
+        let selectedIndex = null;
         let switchStates = { 1: false, 2: false };
-        let userSelection = [];
         const otherPlayers = {};
 
         const startScreen = document.getElementById('start-screen');
@@ -118,41 +119,75 @@
         const puzzleUi = document.getElementById('puzzle-ui');
 
         function setupPuzzleUI() {
-            const container = document.getElementById('number-buttons');
+            currentArray = [...puzzleData.numbers];
+            selectedIndex = null;
+            renderPuzzleButtons();
+
+            let descText = "";
+            let titleText = "";
+            if (puzzleData.type === 'bubble') {
+                titleText = "🫧 버블 정렬 (Bubble Sort)";
+                descText = "인접한 두 숫자를 클릭하여 서로 자리를 교환(Swap)해 오름차순으로 만드세요!";
+            } else if (puzzleData.type === 'selection') {
+                titleText = "🎯 선택 정렬 (Selection Sort)";
+                descText = "숫자 두 개를 선택하여 위치를 바꾸며 오름차순 정렬을 완성하세요!";
+            } else {
+                titleText = "📥 삽입 정렬 (Insertion Sort)";
+                descText = "원하는 숫자를 선택한 뒤 이동할 위치의 숫자를 클릭해 순서를 맞추세요!";
+            }
+            document.getElementById('puzzle-title').innerText = titleText;
+            document.getElementById('puzzle-desc').innerText = descText;
+        }
+
+        function renderPuzzleButtons() {
+            const container = document.getElementById('number-container');
             container.innerHTML = '';
-            puzzleData.numbers.forEach((num) => {
+            currentArray.forEach((num, idx) => {
                 const btn = document.createElement('button');
-                btn.className = 'num-btn';
+                btn.className = 'sort-btn' + (selectedIndex === idx ? ' selected' : '');
                 btn.innerText = num;
-                btn.onclick = () => {
-                    if (userSelection.length < puzzleData.numbers.length) {
-                        userSelection.push(num);
-                        document.getElementById('user-seq').innerText = `[ ${userSelection.join(', ')} ]`;
-                    }
-                };
+                btn.onclick = () => handleNumberClick(idx);
                 container.appendChild(btn);
             });
-            
-            const titles = {
-                bubble: '거품 정렬 (Bubble Sort) 퍼즐',
-                selection: '선택 정렬 (Selection Sort) 퍼즐',
-                insertion: '삽입 정렬 (Insertion Sort) 퍼즐'
-            };
-            document.getElementById('puzzle-title').innerText = titles[puzzleData.type] || '정렬 퍼즐';
-            document.getElementById('target-nums').innerText = `[ ${puzzleData.numbers.join(', ')} ]`;
+        }
+
+        function handleNumberClick(idx) {
+            if (puzzleData.type === 'bubble') {
+                // 버블 정렬: 인접한 두 칸만 교환 가능
+                if (selectedIndex === null) {
+                    selectedIndex = idx;
+                } else {
+                    if (Math.abs(selectedIndex - idx) === 1) {
+                        let temp = currentArray[selectedIndex];
+                        currentArray[selectedIndex] = currentArray[idx];
+                        currentArray[idx] = temp;
+                    } else {
+                        alert('버블 정렬은 바로 옆에 있는 인접한 숫자끼리만 교환할 수 있습니다!');
+                    }
+                    selectedIndex = null;
+                }
+            } else {
+                // 선택/삽입 정렬 등 일반 교환 모드
+                if (selectedIndex === null) {
+                    selectedIndex = idx;
+                } else {
+                    let temp = currentArray[selectedIndex];
+                    currentArray[selectedIndex] = currentArray[idx];
+                    currentArray[idx] = temp;
+                    selectedIndex = null;
+                }
+            }
+            renderPuzzleButtons();
         }
 
         function resetPuzzle() {
-            userSelection = [];
-            document.getElementById('user-seq').innerText = '[ 없음 ]';
+            currentArray = [...puzzleData.numbers];
+            selectedIndex = null;
+            renderPuzzleButtons();
         }
 
         function submitPuzzle() {
-            if (userSelection.length === puzzleData.numbers.length) {
-                socket.emit('submitPuzzle', userSelection);
-            } else {
-                alert('모든 숫자를 순서대로 선택해주세요!');
-            }
+            socket.emit('submitPuzzle', currentArray);
         }
 
         // 3D 씬 구성
@@ -173,7 +208,6 @@
         dirLight.castShadow = true;
         scene.add(dirLight);
 
-        // 방 바닥 및 벽
         const floor = new THREE.Mesh(new THREE.PlaneGeometry(36, 36), new THREE.MeshStandardMaterial({ color: 0x2c3e50, roughness: 0.8 }));
         floor.rotation.x = -Math.PI / 2;
         floor.receiveShadow = true;
@@ -189,7 +223,6 @@
             w.position.set(0, 6, z); scene.add(w);
         });
 
-        // 협동 압력판 2개 (바닥 스위치)
         const plateMat1 = new THREE.MeshStandardMaterial({ color: 0xe74c3c });
         const plateMat2 = new THREE.MeshStandardMaterial({ color: 0xe74c3c });
         const switch1 = new THREE.Mesh(new THREE.BoxGeometry(3, 0.2, 3), plateMat1);
@@ -200,17 +233,14 @@
         switch2.position.set(8, 0.1, 5);
         scene.add(switch2);
 
-        // 탈출구 문
         const door = new THREE.Mesh(new THREE.BoxGeometry(5, 8, 0.6), new THREE.MeshStandardMaterial({ color: 0xd35400 }));
         door.position.set(0, 4, 17.7);
         scene.add(door);
 
-        // 퍼즐 콘솔 단상
         const consoleMesh = new THREE.Mesh(new THREE.BoxGeometry(2.5, 1.5, 1.2), new THREE.MeshStandardMaterial({ color: 0x7f8c8d }));
         consoleMesh.position.set(0, 0.75, -12);
         scene.add(consoleMesh);
 
-        // 플레이어 메시 생성
         const bodyGeo = new THREE.BoxGeometry(1.5, 1.5, 1.5);
         const eyeGeo = new THREE.BoxGeometry(0.18, 0.18, 0.05);
         const eyeMat = new THREE.MeshBasicMaterial({ color: 0x222222 });
@@ -242,7 +272,6 @@
         let isGrounded = false;
         const keys = { forward: false, backward: false, left: false, right: false };
 
-        // 자유 오비트 카메라 회전 변수
         let cameraAngleX = 0;
         let cameraAngleY = 0.5;
         let isDragging = false;
@@ -329,8 +358,7 @@
             });
 
             socket.on('puzzleFailed', () => {
-                alert('❌ 정렬이 틀렸습니다! 오름차순(작은 것부터 큰 순서)으로 다시 맞춰보세요.');
-                resetPuzzle();
+                alert('❌ 정렬이 아직 완료되지 않았거나 틀렸습니다! 오름차순(작은 순서)으로 정확히 맞춰주세요.');
             });
 
             startScreen.style.display = 'none';
@@ -378,29 +406,36 @@
         });
 
         const tempVector = new THREE.Vector3();
+        const forwardVector = new THREE.Vector3();
+        const rightVector = new THREE.Vector3();
+        const moveDir = new THREE.Vector3();
 
         function animate() {
             requestAnimationFrame(animate);
 
             if (gameStarted && myPlayer) {
-                let moveF = 0, moveR = 0;
-                if (keys.forward) moveF += 1;
-                if (keys.backward) moveF -= 1;
-                if (keys.left) moveR -= 1;
-                if (keys.right) moveR += 1;
+                // 카메라 방향 기준 정방향 이동 벡터 계산
+                camera.getWorldDirection(forwardVector);
+                forwardVector.y = 0;
+                forwardVector.normalize();
 
-                if (moveF !== 0 || moveR !== 0) {
-                    const dirX = Math.sin(cameraAngleX) * moveF + Math.cos(cameraAngleX) * moveR;
-                    const dirZ = Math.cos(cameraAngleX) * moveF - Math.sin(cameraAngleX) * moveR;
+                rightVector.set(-forwardVector.z, 0, forwardVector.x);
 
-                    const len = Math.sqrt(dirX * dirX + dirZ * dirZ);
-                    const nx = myPlayer.group.position.x + (dirX / len) * playerSpeed;
-                    const nz = myPlayer.group.position.z + (dirZ / len) * playerSpeed;
+                moveDir.set(0, 0, 0);
+                if (keys.forward) moveDir.add(forwardVector);
+                if (keys.backward) moveDir.sub(forwardVector);
+                if (keys.right) moveDir.add(rightVector);
+                if (keys.left) moveDir.sub(rightVector);
+
+                if (moveDir.length() > 0) {
+                    moveDir.normalize();
+                    const nx = myPlayer.group.position.x + moveDir.x * playerSpeed;
+                    const nz = myPlayer.group.position.z + moveDir.z * playerSpeed;
 
                     if (nx > -17 && nx < 17) myPlayer.group.position.x = nx;
                     if (nz > -17 && nz < 17) myPlayer.group.position.z = nz;
 
-                    myPlayer.group.rotation.y = Math.atan2(dirX, dirZ);
+                    myPlayer.group.rotation.y = Math.atan2(moveDir.x, moveDir.z);
                     myPlayer.body.position.y = 0.75 + Math.abs(Math.sin(Date.now() * 0.015)) * 0.2;
 
                     socket.emit('playerUpdate', {
@@ -421,7 +456,6 @@
                     isGrounded = true;
                 }
 
-                // 협동 압력판 감지 체크
                 const pos = myPlayer.group.position;
                 const onSwitch1 = Math.abs(pos.x - (-8)) < 1.8 && Math.abs(pos.z - 5) < 1.8;
                 const onSwitch2 = Math.abs(pos.x - 8) < 1.8 && Math.abs(pos.z - 5) < 1.8;
@@ -433,7 +467,6 @@
                     socket.emit('updateSwitch', { switchId: 2, pressed: onSwitch2 });
                 }
 
-                // 두 스위치가 모두 켜져야 콘솔 퍼즐 활성화
                 const bothPressed = switchStates[1] && switchStates[2];
                 const distToConsole = pos.distanceTo(new THREE.Vector3(0, 0, -12));
                 if (distToConsole < 3.5 && bothPressed && !roomSolved) {
@@ -442,7 +475,6 @@
                     puzzleUi.style.display = 'none';
                 }
 
-                // 자유 오비트 카메라 위치 갱신
                 const dist = 7;
                 const cx = pos.x + Math.sin(cameraAngleX) * dist * Math.cos(cameraAngleY);
                 const cy = pos.y + 2 + Math.sin(cameraAngleY) * dist;
