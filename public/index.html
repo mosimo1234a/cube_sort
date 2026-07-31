@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>3D 네모 멀티플레이어 - 시프트락</title>
+    <title>큐브 정렬 방탈출 멀티플레이어</title>
     <style>
         body {
             margin: 0;
@@ -18,10 +18,10 @@
             left: 50%;
             transform: translateX(-50%);
             color: white;
-            background: rgba(0, 0, 0, 0.7);
+            background: rgba(0, 0, 0, 0.75);
             padding: 10px 20px;
             border-radius: 20px;
-            font-size: 15px;
+            font-size: 14px;
             pointer-events: none;
             text-align: center;
             box-shadow: 0 4px 6px rgba(0,0,0,0.3);
@@ -45,18 +45,18 @@
             border-radius: 20px;
             text-align: center;
             box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-            width: 300px;
+            width: 320px;
         }
         .modal-box h2 { margin-top: 0; color: #333; }
-        .modal-box input[type="text"] {
-            width: 80%; padding: 10px;
-            font-size: 16px; border: 2px solid #ddd;
-            border-radius: 8px; margin-bottom: 15px;
+        .modal-box input {
+            width: 85%; padding: 10px;
+            font-size: 15px; border: 2px solid #ddd;
+            border-radius: 8px; margin-bottom: 12px;
             text-align: center; outline: none;
         }
-        .modal-box input[type="text"]:focus { border-color: #ffd700; }
+        .modal-box input:focus { border-color: #4a90e2; }
         .color-picker-wrapper {
-            margin-bottom: 20px;
+            margin-bottom: 15px;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -65,16 +65,15 @@
             color: #555;
         }
         .modal-box input[type="color"] {
-            width: 40px; height: 35px;
-            border: none; border-radius: 6px;
-            cursor: pointer; background: none;
+            width: 40px; height: 35px; border: none; border-radius: 6px; cursor: pointer; background: none;
         }
         .modal-box button {
             width: 100%; padding: 12px;
-            font-size: 16px; background: #ffd700;
+            font-size: 16px; background: #4a90e2;
             border: none; border-radius: 8px;
-            cursor: pointer; font-weight: bold; color: #333;
+            cursor: pointer; font-weight: bold; color: white;
         }
+        .modal-box button:hover { background: #357abd; }
         .name-tag {
             position: absolute;
             color: white;
@@ -89,25 +88,48 @@
             display: none;
             box-shadow: 0 2px 4px rgba(0,0,0,0.3);
         }
-        .my-tag { background: rgba(255, 165, 0, 0.85); }
+        .my-tag { background: rgba(74, 144, 226, 0.85); }
+        #puzzle-ui {
+            position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.8); padding: 15px 25px; border-radius: 12px;
+            color: white; display: none; text-align: center; z-index: 5;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+        }
+        .puzzle-btn {
+            padding: 8px 14px; margin: 4px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer;
+        }
     </style>
 </head>
 <body>
     <div id="start-screen">
         <div class="modal-box">
-            <h2>✨ 시프트락 모험 ✨</h2>
-            <p style="color: #666; font-size: 14px; margin-bottom: 15px;">정보를 입력하고 접속하세요!</p>
-            <input type="text" id="nickname-input" value="귀여운네모" maxlength="10">
+            <h2>🧩 큐브 정렬 방탈출</h2>
+            <p style="color: #666; font-size: 13px; margin-bottom: 15px;">방 이름과 캐릭터 정보를 입력하세요!</p>
+            <input type="text" id="room-input" value="방탈출1번방" placeholder="방 이름">
+            <input type="text" id="nickname-input" value="탈출러" maxlength="10" placeholder="닉네임">
             <div class="color-picker-wrapper">
-                <label for="color-input">내 네모 색상:</label>
-                <input type="color" id="color-input" value="#ffd700">
+                <label for="color-input">네모 색상:</label>
+                <input type="color" id="color-input" value="#ff5722">
             </div>
-            <button id="start-btn">멀티 접속하기</button>
+            <button id="start-btn">방 입장하기</button>
         </div>
     </div>
 
     <div id="instructions">
-        <strong>화면 클릭</strong>: 마우스 고정(시프트락) | <strong>WASD</strong>: 이동 | <strong>SPACE</strong>: 점프 | <strong>ESC</strong>: 마우스 해제
+        <strong>화면 클릭</strong>: 시프트락(시점 고정) | <strong>WASD</strong>: 이동 | <strong>SPACE</strong>: 점프 | <strong>정렬 장치 접근</strong>: 퍼즐 풀기
+    </div>
+
+    <div id="puzzle-ui">
+        <h3 style="margin:0 0 10px 0; color:#ffd700;">색상 정렬 패널 (순서대로 클릭!)</h3>
+        <p style="font-size:12px; color:#aaa; margin:0 0 10px 0;">힌트 벽의 색상 순서를 맞추세요</p>
+        <div id="sequence-display" style="font-size:16px; margin-bottom:10px; font-weight:bold;">[선택된 순서: 없음]</div>
+        <button class="puzzle-btn" style="background:#ff4d4d; color:white;" onclick="addPuzzleSeq('red')">빨강</button>
+        <button class="puzzle-btn" style="background:#2ecc71; color:white;" onclick="addPuzzleSeq('green')">초록</button>
+        <button class="puzzle-btn" style="background:#3498db; color:white;" onclick="addPuzzleSeq('blue')">파랑</button>
+        <button class="puzzle-btn" style="background:#f1c40f; color:black;" onclick="addPuzzleSeq('yellow')">노랑</button>
+        <br><br>
+        <button onclick="submitPuzzle()" style="background:#27ae60; color:white; padding:8px 16px; border:none; border-radius:6px; cursor:pointer; font-weight:bold;">제출하기</button>
+        <button onclick="resetPuzzle()" style="background:#e74c3c; color:white; padding:8px 16px; border:none; border-radius:6px; cursor:pointer; font-weight:bold;">초기화</button>
     </div>
 
     <div id="my-name-tag" class="name-tag my-tag"></div>
@@ -118,19 +140,47 @@
     <script>
         let gameStarted = false;
         let socket;
+        let currentRoomSolved = false;
         const otherPlayers = {};
 
         const startScreen = document.getElementById('start-screen');
         const startBtn = document.getElementById('start-btn');
+        const roomInput = document.getElementById('room-input');
         const nicknameInput = document.getElementById('nickname-input');
         const colorInput = document.getElementById('color-input');
         const instructions = document.getElementById('instructions');
         const myNameTag = document.getElementById('my-name-tag');
+        const puzzleUi = document.getElementById('puzzle-ui');
+
+        let currentSequence = [];
+
+        function addPuzzleSeq(color) {
+            if (currentSequence.length < 4) {
+                currentSequence.push(color);
+                updateSeqDisplay();
+            }
+        }
+        function resetPuzzle() {
+            currentSequence = [];
+            updateSeqDisplay();
+        }
+        function updateSeqDisplay() {
+            const names = { red: '빨강', green: '초록', blue: '파랑', yellow: '노랑' };
+            const text = currentSequence.map(c => names[c]).join(' ➔ ');
+            document.getElementById('sequence-display').innerText = text ? `[ ${text} ]` : '[선택된 순서: 없음]';
+        }
+        function submitPuzzle() {
+            if (currentSequence.length === 4) {
+                socket.emit('submitPuzzle', currentSequence);
+            } else {
+                alert('4가지 색상을 모두 선택해주세요!');
+            }
+        }
 
         // 3D 씬 설정
         const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x87ceeb);
-        scene.fog = new THREE.Fog(0x87ceeb, 25, 60);
+        scene.background = new THREE.Color(0x111111);
+        scene.fog = new THREE.Fog(0x111111, 15, 45);
 
         const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
         const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -139,25 +189,70 @@
         renderer.outputEncoding = THREE.sRGBEncoding;
         document.body.appendChild(renderer.domElement);
 
-        scene.add(new THREE.AmbientLight(0xffffff, 0.7));
-        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.9);
-        directionalLight.position.set(15, 25, 10);
+        scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        directionalLight.position.set(10, 20, 10);
         directionalLight.castShadow = true;
         scene.add(directionalLight);
 
+        // 방 바닥
         const floor = new THREE.Mesh(
-            new THREE.PlaneGeometry(150, 150),
-            new THREE.MeshStandardMaterial({ color: 0x7cfc00, roughness: 0.8 })
+            new THREE.PlaneGeometry(30, 30),
+            new THREE.MeshStandardMaterial({ color: 0x333333, roughness: 0.9 })
         );
         floor.rotation.x = -Math.PI / 2;
         floor.receiveShadow = true;
         scene.add(floor);
 
+        // 방 벽 만들기 (방탈출 느낌)
+        const wallMat = new THREE.MeshStandardMaterial({ color: 0x4a5568, roughness: 0.7 });
+        const wall1 = new THREE.Mesh(new THREE.BoxGeometry(30, 10, 1), wallMat);
+        wall1.position.set(0, 5, -15);
+        scene.add(wall1);
+
+        const wall2 = new THREE.Mesh(new THREE.BoxGeometry(30, 10, 1), wallMat);
+        wall2.position.set(0, 5, 15);
+        scene.add(wall2);
+
+        const wall3 = new THREE.Mesh(new THREE.BoxGeometry(1, 10, 30), wallMat);
+        wall3.position.set(-15, 5, 0);
+        scene.add(wall3);
+
+        const wall4 = new THREE.Mesh(new THREE.BoxGeometry(1, 10, 30), wallMat);
+        wall4.position.set(15, 5, 0);
+        scene.add(wall4);
+
+        // 힌트 벽 판넬 (색상 순서 힌트: 빨 -> 초 -> 파 -> 노)
+        const hintGroup = new THREE.Group();
+        const hintBg = new THREE.Mesh(new THREE.BoxGeometry(4, 2, 0.1), new THREE.MeshStandardMaterial({ color: 0x000000 }));
+        hintGroup.add(hintBg);
+        
+        const colors = [0xff4d4d, 0x2ecc71, 0x3498db, 0xf1c40f];
+        colors.forEach((col, idx) => {
+            const dot = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.6, 0.2), new THREE.MeshBasicMaterial({ color: col }));
+            dot.position.set(-1.35 + (idx * 0.9), 0, 0.05);
+            hintGroup.add(dot);
+        });
+        hintGroup.position.set(0, 4, -14.4);
+        scene.add(hintGroup);
+
+        // 탈출구 문 (정답 시 열림)
+        const doorMat = new THREE.MeshStandardMaterial({ color: 0x8b4513 });
+        const door = new THREE.Mesh(new THREE.BoxGeometry(4, 7, 0.5), doorMat);
+        door.position.set(0, 3.5, 14.6);
+        scene.add(door);
+
+        // 퍼즐 조작대 (단상)
+        const consoleMesh = new THREE.Mesh(new THREE.BoxGeometry(2, 1.5, 1), new THREE.MeshStandardMaterial({ color: 0x7f8c8d }));
+        consoleMesh.position.set(0, 0.75, -10);
+        scene.add(consoleMesh);
+
+        // 플레이어 캐릭터 구조
         const bodyGeo = new THREE.BoxGeometry(1.5, 1.5, 1.5);
         const eyeGeo = new THREE.BoxGeometry(0.18, 0.18, 0.05);
         const eyeMat = new THREE.MeshBasicMaterial({ color: 0x222222 });
 
-        function createPlayerMesh(colorHex = '#ffd700') {
+        function createPlayerMesh(colorHex = '#ff5722') {
             const group = new THREE.Group();
             const bodyMat = new THREE.MeshStandardMaterial({ color: colorHex, roughness: 0.3 });
             const body = new THREE.Mesh(bodyGeo, bodyMat);
@@ -178,24 +273,21 @@
 
         let myPlayer;
         let playerVelocity = new THREE.Vector3();
-        const playerSpeed = 0.15;
+        const playerSpeed = 0.13;
         const gravity = 0.02;
         const jumpForce = 0.4;
         let isGrounded = false;
         const keys = { forward: false, backward: false, left: false, right: false };
 
-        // 시프트락 카메라 및 회전 변수
-        let cameraAngleX = 0; // 좌우 회전 (캐릭터 방향과 일치)
-        let cameraAngleY = 0.4; // 상하 각도
+        let cameraAngleX = 0;
+        let cameraAngleY = 0.4;
 
-        // 화면 클릭 시 포인터 락 활성화 (시프트락)
         renderer.domElement.addEventListener('click', () => {
             if (gameStarted && document.pointerLockElement !== renderer.domElement) {
                 renderer.domElement.requestPointerLock();
             }
         });
 
-        // 마우스 이동으로 시점 회전 (로블록스 시프트락 방식)
         window.addEventListener('mousemove', (e) => {
             if (!gameStarted) return;
             if (document.pointerLockElement === renderer.domElement) {
@@ -206,7 +298,8 @@
         });
 
         startBtn.addEventListener('click', () => {
-            const nickname = nicknameInput.value.trim() || '네모';
+            const roomId = roomInput.value.trim() || 'default-room';
+            const nickname = nicknameInput.value.trim() || '탈출러';
             const selectedColor = colorInput.value;
             myNameTag.innerText = nickname;
 
@@ -214,7 +307,14 @@
             scene.add(myPlayer.group);
 
             socket = io();
-            socket.emit('joinGame', { nickname, color: selectedColor });
+            socket.emit('joinRoom', { roomId, nickname, color: selectedColor });
+
+            socket.on('roomState', (state) => {
+                if (state.isSolved) {
+                    currentRoomSolved = true;
+                    door.position.y = -10; // 문 열림
+                }
+            });
 
             socket.on('currentPlayers', (players) => {
                 Object.keys(players).forEach((id) => {
@@ -241,17 +341,27 @@
                 }
             });
 
+            socket.on('puzzleSolved', () => {
+                currentRoomSolved = true;
+                door.position.y = -10; // 문이 땅 아래로 내려가며 열림
+                puzzleUi.style.display = 'none';
+                alert('🎉 정답입니다! 탈출구 문이 열렸습니다!');
+            });
+
+            socket.on('puzzleFailed', () => {
+                alert('❌ 틀렸습니다! 힌트 벽의 순서를 다시 확인하세요.');
+                resetPuzzle();
+            });
+
             startScreen.style.display = 'none';
             instructions.style.display = 'block';
             myNameTag.style.display = 'block';
             gameStarted = true;
-
-            // 게임 시작과 동시에 포인터 락 요청
             renderer.domElement.requestPointerLock();
         });
 
         function addOtherPlayer(playerData) {
-            const remoteMesh = createPlayerMesh(playerData.color || '#6bdaff');
+            const remoteMesh = createPlayerMesh(playerData.color || '#3498db');
             remoteMesh.group.position.set(playerData.x, playerData.y, playerData.z);
             scene.add(remoteMesh.group);
 
@@ -289,7 +399,6 @@
             requestAnimationFrame(animate);
 
             if (gameStarted && myPlayer) {
-                // 시프트락: 캐릭터의 바라보는 방향을 마우스가 향하는 방향(cameraAngleX)과 일치시킴
                 myPlayer.group.rotation.y = cameraAngleX;
 
                 let moveForward = 0;
@@ -301,7 +410,6 @@
                 if (keys.right) moveRight += 1;
 
                 if (moveForward !== 0 || moveRight !== 0) {
-                    // 바라보는 방향(cameraAngleX) 기준 상대 이동 계산
                     const dirX = -Math.sin(cameraAngleX) * moveForward - Math.cos(cameraAngleX) * moveRight;
                     const dirZ = -Math.cos(cameraAngleX) * moveForward + Math.sin(cameraAngleX) * moveRight;
 
@@ -309,8 +417,13 @@
                     const moveX = (dirX / len) * playerSpeed;
                     const moveZ = (dirZ / len) * playerSpeed;
 
-                    myPlayer.group.position.x += moveX;
-                    myPlayer.group.position.z += moveZ;
+                    // 방 벽 충돌 제한 (벽 바깥으로 못 나가게)
+                    const nextX = myPlayer.group.position.x + moveX;
+                    const nextZ = myPlayer.group.position.z + moveZ;
+
+                    if (nextX > -14 && nextX < 14) myPlayer.group.position.x = nextX;
+                    if (nextZ > -14 && nextZ < 14) myPlayer.group.position.z = nextZ;
+
                     myPlayer.body.position.y = 0.75 + Math.abs(Math.sin(Date.now() * 0.015)) * 0.2;
 
                     socket.emit('playerUpdate', {
@@ -332,7 +445,14 @@
                     isGrounded = true;
                 }
 
-                // 시프트락 3인칭 카메라 위치 계산 (캐릭터 등 뒤 고정)
+                // 조작대(콘솔) 근처에 가면 퍼즐 UI 활성화
+                const distToConsole = myPlayer.group.position.distanceTo(new THREE.Vector3(0, 0, -10));
+                if (distToConsole < 3.5 && !currentRoomSolved) {
+                    puzzleUi.style.display = 'block';
+                } else {
+                    puzzleUi.style.display = 'none';
+                }
+
                 const distance = 6;
                 const targetCamX = myPlayer.group.position.x + Math.sin(cameraAngleX) * distance;
                 const targetCamY = myPlayer.group.position.y + 2 + Math.sin(cameraAngleY) * 3;
