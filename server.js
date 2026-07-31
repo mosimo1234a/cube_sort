@@ -13,7 +13,6 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 const rooms = {};
 
-// 알고리즘 퍼즐 생성 (버블, 선택, 삽입 중 랜덤)
 function generatePuzzle() {
     const types = ['bubble', 'selection', 'insertion'];
     const type = types[Math.floor(Math.random() * types.length)];
@@ -40,7 +39,7 @@ io.on('connection', (socket) => {
         if (!rooms[socket.roomId]) {
             rooms[socket.roomId] = {
                 players: {},
-                switches: { 1: false, 2: false },
+                switchActivated: false, // 스위치 밟으면 영구 활성화
                 puzzle: generatePuzzle(),
                 isSolved: false
             };
@@ -58,7 +57,7 @@ io.on('connection', (socket) => {
             isSolved: rooms[socket.roomId].isSolved,
             puzzleType: rooms[socket.roomId].puzzle.type,
             numbers: rooms[socket.roomId].puzzle.numbers,
-            switches: rooms[socket.roomId].switches
+            switchActivated: rooms[socket.roomId].switchActivated
         });
 
         socket.broadcast.to(socket.roomId).emit('newPlayer', rooms[socket.roomId].players[socket.id]);
@@ -76,11 +75,11 @@ io.on('connection', (socket) => {
         }
     });
 
-    socket.on('updateSwitch', (data) => {
+    socket.on('activateSwitch', () => {
         const roomId = socket.roomId;
-        if (roomId && rooms[roomId]) {
-            rooms[roomId].switches[data.switchId] = data.pressed;
-            io.to(roomId).emit('switchStateUpdate', rooms[roomId].switches);
+        if (roomId && rooms[roomId] && !rooms[roomId].switchActivated) {
+            rooms[roomId].switchActivated = true;
+            io.to(roomId).emit('switchActivatedUpdate', true);
         }
     });
 
