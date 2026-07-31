@@ -3,17 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>3D 네모 멀티플레이어</title>
+    <title>3D 네모 멀티플레이어 - 시프트락</title>
     <style>
         body {
             margin: 0;
             overflow: hidden;
             background-color: #222;
             font-family: 'Arial', sans-serif;
-            cursor: grab;
-        }
-        body:active {
-            cursor: grabbing;
+            cursor: crosshair;
         }
         #instructions {
             position: absolute;
@@ -21,10 +18,10 @@
             left: 50%;
             transform: translateX(-50%);
             color: white;
-            background: rgba(0, 0, 0, 0.6);
+            background: rgba(0, 0, 0, 0.7);
             padding: 10px 20px;
             border-radius: 20px;
-            font-size: 16px;
+            font-size: 15px;
             pointer-events: none;
             text-align: center;
             box-shadow: 0 4px 6px rgba(0,0,0,0.3);
@@ -98,7 +95,7 @@
 <body>
     <div id="start-screen">
         <div class="modal-box">
-            <h2>✨ 멀티 네모 모험 ✨</h2>
+            <h2>✨ 시프트락 모험 ✨</h2>
             <p style="color: #666; font-size: 14px; margin-bottom: 15px;">정보를 입력하고 접속하세요!</p>
             <input type="text" id="nickname-input" value="귀여운네모" maxlength="10">
             <div class="color-picker-wrapper">
@@ -110,7 +107,7 @@
     </div>
 
     <div id="instructions">
-        <strong>WASD / 방향키</strong>: 이동 | <strong>SPACE</strong>: 점프 | <strong>마우스 드래그</strong>: 시점 회전
+        <strong>화면 클릭</strong>: 마우스 고정(시프트락) | <strong>WASD</strong>: 이동 | <strong>SPACE</strong>: 점프 | <strong>ESC</strong>: 마우스 해제
     </div>
 
     <div id="my-name-tag" class="name-tag my-tag"></div>
@@ -187,30 +184,26 @@
         let isGrounded = false;
         const keys = { forward: false, backward: false, left: false, right: false };
 
-        // 카메라 및 마우스 회전 변수
-        let cameraAngleX = 0;
-        let cameraAngleY = 0.4;
-        let isDragging = false;
-        let previousMousePosition = { x: 0, y: 0 };
+        // 시프트락 카메라 및 회전 변수
+        let cameraAngleX = 0; // 좌우 회전 (캐릭터 방향과 일치)
+        let cameraAngleY = 0.4; // 상하 각도
 
-        window.addEventListener('mousedown', (e) => {
-            if (!gameStarted) return;
-            isDragging = true;
-            previousMousePosition = { x: e.clientX, y: e.clientY };
+        // 화면 클릭 시 포인터 락 활성화 (시프트락)
+        renderer.domElement.addEventListener('click', () => {
+            if (gameStarted && document.pointerLockElement !== renderer.domElement) {
+                renderer.domElement.requestPointerLock();
+            }
         });
 
+        // 마우스 이동으로 시점 회전 (로블록스 시프트락 방식)
         window.addEventListener('mousemove', (e) => {
-            if (!gameStarted || !isDragging) return;
-            const deltaX = e.clientX - previousMousePosition.x;
-            const deltaY = e.clientY - previousMousePosition.y;
-
-            cameraAngleX -= deltaX * 0.005;
-            cameraAngleY = Math.max(0.05, Math.min(1.4, cameraAngleY + deltaY * 0.005));
-
-            previousMousePosition = { x: e.clientX, y: e.clientY };
+            if (!gameStarted) return;
+            if (document.pointerLockElement === renderer.domElement) {
+                const sensitivity = 0.003;
+                cameraAngleX -= e.movementX * sensitivity;
+                cameraAngleY = Math.max(0.05, Math.min(1.3, cameraAngleY + e.movementY * sensitivity));
+            }
         });
-
-        window.addEventListener('mouseup', () => { isDragging = false; });
 
         startBtn.addEventListener('click', () => {
             const nickname = nicknameInput.value.trim() || '네모';
@@ -252,6 +245,9 @@
             instructions.style.display = 'block';
             myNameTag.style.display = 'block';
             gameStarted = true;
+
+            // 게임 시작과 동시에 포인터 락 요청
+            renderer.domElement.requestPointerLock();
         });
 
         function addOtherPlayer(playerData) {
@@ -293,6 +289,9 @@
             requestAnimationFrame(animate);
 
             if (gameStarted && myPlayer) {
+                // 시프트락: 캐릭터의 바라보는 방향을 마우스가 향하는 방향(cameraAngleX)과 일치시킴
+                myPlayer.group.rotation.y = cameraAngleX;
+
                 let moveForward = 0;
                 let moveRight = 0;
 
@@ -302,20 +301,16 @@
                 if (keys.right) moveRight += 1;
 
                 if (moveForward !== 0 || moveRight !== 0) {
-                    // 카메라 시점을 기준으로 이동 방향 계산
-                    const dirX = Math.sin(cameraAngleX) * moveForward + Math.cos(cameraAngleX) * moveRight;
-                    const dirZ = Math.cos(cameraAngleX) * moveForward - Math.sin(cameraAngleX) * moveRight;
+                    // 바라보는 방향(cameraAngleX) 기준 상대 이동 계산
+                    const dirX = -Math.sin(cameraAngleX) * moveForward - Math.cos(cameraAngleX) * moveRight;
+                    const dirZ = -Math.cos(cameraAngleX) * moveForward + Math.sin(cameraAngleX) * moveRight;
 
-                    const targetAngle = Math.atan2(dirX, dirZ);
-                    let currentAngle = myPlayer.group.rotation.y;
-                    let angleDiff = targetAngle - currentAngle;
-                    
-                    while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
-                    while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
-                    myPlayer.group.rotation.y += angleDiff * 0.15;
+                    const len = Math.sqrt(dirX * dirX + dirZ * dirZ);
+                    const moveX = (dirX / len) * playerSpeed;
+                    const moveZ = (dirZ / len) * playerSpeed;
 
-                    myPlayer.group.position.x += dirX * playerSpeed;
-                    myPlayer.group.position.z += dirZ * playerSpeed;
+                    myPlayer.group.position.x += moveX;
+                    myPlayer.group.position.z += moveZ;
                     myPlayer.body.position.y = 0.75 + Math.abs(Math.sin(Date.now() * 0.015)) * 0.2;
 
                     socket.emit('playerUpdate', {
@@ -337,13 +332,13 @@
                     isGrounded = true;
                 }
 
-                // 마우스 회전 각도에 따른 3인칭 카메라 위치 계산
-                const distance = 7;
-                const targetCamX = myPlayer.group.position.x + Math.sin(cameraAngleX) * distance * Math.cos(cameraAngleY);
-                const targetCamY = myPlayer.group.position.y + 2 + Math.sin(cameraAngleY) * distance;
-                const targetCamZ = myPlayer.group.position.z + Math.cos(cameraAngleX) * distance * Math.cos(cameraAngleY);
+                // 시프트락 3인칭 카메라 위치 계산 (캐릭터 등 뒤 고정)
+                const distance = 6;
+                const targetCamX = myPlayer.group.position.x + Math.sin(cameraAngleX) * distance;
+                const targetCamY = myPlayer.group.position.y + 2 + Math.sin(cameraAngleY) * 3;
+                const targetCamZ = myPlayer.group.position.z + Math.cos(cameraAngleX) * distance;
 
-                camera.position.lerp(new THREE.Vector3(targetCamX, targetCamY, targetCamZ), 0.15);
+                camera.position.set(targetCamX, targetCamY, targetCamZ);
                 camera.lookAt(myPlayer.group.position.x, myPlayer.group.position.y + 1, myPlayer.group.position.z);
 
                 updateTagPosition(myPlayer.group, myNameTag, 1.8);
