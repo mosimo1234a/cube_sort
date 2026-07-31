@@ -11,41 +11,74 @@ const io = new Server(server, {
 
 app.use(express.static(path.join(__dirname, 'public')));
 
-const players = {};
+const rooms = {}; // 방별 플레이어 및 퍼즐 상태 관리
 
 io.on('connection', (socket) => {
-    console.log(`플레이어 접속: ${socket.id}`);
+    console.log(`플레이어 연결됨: ${socket.id}`);
 
-    socket.on('joinGame', (data) => {
-        players[socket.id] = {
+    socket.on('joinRoom', (data) => {
+        const { nickname, color, roomId } = data;
+        socket.roomId = roomId || 'default-room';
+        socket.join(socket.roomId);
+
+        if (!rooms[socket.roomId]) {
+            rooms[socket.roomId] = {
+                players: {},
+                isSolved: false
+            };
+        }
+
+        rooms[socket.roomId].players[socket.id] = {
             id: socket.id,
-            nickname: data.nickname || '네모',
-            color: data.color || '#ffd700', // 선택한 색상 저장
-            x: 0,
-            y: 0,
-            z: 0,
-            rotationY: 0
+            nickname: nickname || '네모',
+            color: color || '#ffd700',
+            x: 0, y: 0, z: 0, rotationY: 0
         };
 
-        socket.emit('currentPlayers', players);
-        socket.broadcast.emit('newPlayer', players[socket.id]);
+        // 현재 방의 플레이어 정보 및 퍼즐 상태 전송
+        socket.emit('currentPlayers', rooms[socket.roomId].players);
+        socket.emit('roomState', { isSolved: rooms[socket.roomId].isSolved });
+        socket.broadcast.to(socket.roomId).emit('newPlayer', rooms[socket.roomId].players[socket.id]);
     });
 
     socket.on('playerUpdate', (data) => {
-        if (players[socket.id]) {
-            players[socket.id].x = data.x;
-            players[socket.id].y = data.y;
-            players[socket.id].z = data.z;
-            players[socket.id].rotationY = data.rotationY;
+        const roomId = socket.roomId;
+        if (roomId && rooms[roomId] && rooms[roomId].players[socket.id]) {
+            const p = rooms[roomId].players[socket.id];
+            p.x = data.x;
+            p.y = data.y;
+            p.z = data.z;
+            p.rotationY = data.rotationY;
+            socket.broadcast.to(roomId).emit('playerMoved', p);
+        }
+    });
 
-            socket.broadcast.emit('playerMoved', players[socket.id]);
+    socket.on('submitPuzzle', (sequence) => {
+        const roomId = socket.roomId;
+        // 정답 순서: 빨강(Red) -> 초록(Green) -> 파랑(Blue) -> 노랑(Yellow)
+        const correctSequence = ['red', 'green', 'blue', 'yellow'];
+        
+        if (roomId && rooms[roomId]) {
+            const isCorrect = sequence.every((val, index) => val === correctSequence[index]);
+            if (isCorrect) {
+                rooms[roomId].isSolved = true;
+                io.to(roomId).emit('puzzleSolved');
+            } else {
+                socket.emit('puzzleFailed');
+            }
         }
     });
 
     socket.on('disconnect', () => {
-        console.log(`플레이어 퇴장: ${socket.id}`);
-        delete players[socket.id];
-        io.emit('playerDisconnected', socket.id);
+        const roomId = socket.roomId;
+        if (roomId && rooms[roomId]) {
+            delete rooms[roomId].players[socket.id];
+            socket.broadcast.to(roomId).emit('playerDisconnected', socket.id);
+            
+            if (Object.keys(rooms[roomId].players).length === 0) {
+                delete rooms[roomId];
+            }
+        }
     });
 });
 
