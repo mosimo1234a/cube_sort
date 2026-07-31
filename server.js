@@ -1,7 +1,6 @@
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
-const path = require('path');
 
 const app = express();
 const server = http.createServer(app);
@@ -9,49 +8,329 @@ const io = new Server(server, {
     cors: { origin: "*" }
 });
 
-// public 폴더의 정적 파일 제공
-app.use(express.static(path.join(__dirname, 'public')));
+// 루트 경로('/')로 접속했을 때 HTML 웹페이지를 직접 반환
+app.get('/', (req, res) => {
+    res.send(`<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D 네모 멀티플레이어</title>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #222; font-family: 'Arial', sans-serif; }
+        #instructions {
+            position: absolute; top: 20px; left: 50%; transform: translateX(-50%);
+            color: white; background: rgba(0, 0, 0, 0.6); padding: 10px 20px;
+            border-radius: 20px; font-size: 16px; pointer-events: none; text-align: center;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3); display: none; z-index: 5;
+        }
+        #start-screen {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.85); display: flex; justify-content: center;
+            align-items: center; z-index: 10;
+        }
+        .modal-box {
+            background: white; padding: 40px; border-radius: 20px; text-align: center;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5); width: 300px;
+        }
+        .modal-box h2 { margin-top: 0; color: #333; }
+        .modal-box input {
+            width: 80%; padding: 12px; font-size: 16px; border: 2px solid #ddd;
+            border-radius: 8px; margin-bottom: 20px; text-align: center; outline: none;
+        }
+        .modal-box input:focus { border-color: #ffd700; }
+        .modal-box button {
+            width: 100%; padding: 12px; font-size: 16px; background: #ffd700;
+            border: none; border-radius: 8px; cursor: pointer; font-weight: bold; color: #333;
+        }
+        .name-tag {
+            position: absolute; color: white; background: rgba(0, 0, 0, 0.6);
+            padding: 4px 10px; border-radius: 12px; font-size: 12px; font-weight: bold;
+            pointer-events: none; transform: translate(-50%, -100%); white-space: nowrap;
+            display: none; box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+        .my-tag { background: rgba(255, 165, 0, 0.8); }
+    </style>
+</head>
+<body>
+    <div id="start-screen">
+        <div class="modal-box">
+            <h2>✨ 멀티 네모 모험 ✨</h2>
+            <p style="color: #666; font-size: 14px; margin-bottom: 20px;">닉네임을 입력하고 접속하세요!</p>
+            <input type="text" id="nickname-input" value="귀여운네모" maxlength="10">
+            <br>
+            <button id="start-btn">멀티 접속하기</button>
+        </div>
+    </div>
 
-// 접속한 플레이어 목록 관리
+    <div id="instructions">
+        <strong>WASD</strong> / <strong>방향키</strong>: 이동 | <strong>SPACEBAR</strong>: 점프
+    </div>
+
+    <div id="my-name-tag" class="name-tag my-tag"></div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="/socket.io/socket.io.js"></script>
+
+    <script>
+        let gameStarted = false;
+        let socket;
+        const otherPlayers = {};
+
+        const startScreen = document.getElementById('start-screen');
+        const startBtn = document.getElementById('start-btn');
+        const nicknameInput = document.getElementById('nickname-input');
+        const instructions = document.getElementById('instructions');
+        const myNameTag = document.getElementById('my-name-tag');
+
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x87ceeb);
+        scene.fog = new THREE.Fog(0x87ceeb, 25, 60);
+
+        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+        renderer.outputEncoding = THREE.sRGBEncoding;
+        document.body.appendChild(renderer.domElement);
+
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+        scene.add(ambientLight);
+
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.9);
+        directionalLight.position.set(15, 25, 10);
+        directionalLight.castShadow = true;
+        scene.add(directionalLight);
+
+        const floor = new THREE.Mesh(
+            new THREE.PlaneGeometry(150, 150),
+            new THREE.MeshStandardMaterial({ color: 0x7cfc00, roughness: 0.8 })
+        );
+        floor.rotation.x = -Math.PI / 2;
+        floor.receiveShadow = true;
+        scene.add(floor);
+
+        const bodyGeo = new THREE.BoxGeometry(1.5, 1.5, 1.5);
+        const eyeGeo = new THREE.BoxGeometry(0.18, 0.18, 0.05);
+        const eyeMat = new THREE.MeshBasicMaterial({ color: 0x222222 });
+
+        function createPlayerMesh(color = 0xffd700) {
+            const group = new THREE.Group();
+            const bodyMat = new THREE.MeshStandardMaterial({ color, roughness: 0.3 });
+            const body = new THREE.Mesh(bodyGeo, bodyMat);
+            body.position.y = 0.75;
+            body.castShadow = true;
+            group.add(body);
+
+            const leftEye = new THREE.Mesh(eyeGeo, eyeMat);
+            leftEye.position.set(-0.35, 0.9, 0.77);
+            group.add(leftEye);
+
+            const rightEye = new THREE.Mesh(eyeGeo, eyeMat);
+            rightEye.position.set(0.35, 0.9, 0.77);
+            group.add(rightEye);
+
+            return { group, body };
+        }
+
+        const myPlayer = createPlayerMesh(0xffd700);
+        scene.add(myPlayer.group);
+
+        const playerVelocity = new THREE.Vector3();
+        const playerSpeed = 0.15;
+        const gravity = 0.02;
+        const jumpForce = 0.4;
+        let isGrounded = false;
+        const keys = { forward: false, backward: false, left: false, right: false };
+
+        startBtn.addEventListener('click', () => {
+            const nickname = nicknameInput.value.trim() || '네모';
+            myNameTag.innerText = nickname;
+
+            socket = io();
+
+            socket.emit('joinGame', { nickname });
+
+            socket.on('currentPlayers', (players) => {
+                Object.keys(players).forEach((id) => {
+                    if (id !== socket.id) addOtherPlayer(players[id]);
+                });
+            });
+
+            socket.on('newPlayer', (playerData) => {
+                addOtherPlayer(playerData);
+            });
+
+            socket.on('playerMoved', (playerData) => {
+                if (otherPlayers[playerData.id]) {
+                    otherPlayers[playerData.id].group.position.set(playerData.x, playerData.y, playerData.z);
+                    otherPlayers[playerData.id].group.rotation.y = playerData.rotationY;
+                }
+            });
+
+            socket.on('playerDisconnected', (id) => {
+                if (otherPlayers[id]) {
+                    scene.remove(otherPlayers[id].group);
+                    document.body.removeChild(otherPlayers[id].tag);
+                    delete otherPlayers[id];
+                }
+            });
+
+            startScreen.style.display = 'none';
+            instructions.style.display = 'block';
+            myNameTag.style.display = 'block';
+            gameStarted = true;
+        });
+
+        function addOtherPlayer(playerData) {
+            const remoteMesh = createPlayerMesh(0x6bdaff);
+            remoteMesh.group.position.set(playerData.x, playerData.y, playerData.z);
+            scene.add(remoteMesh.group);
+
+            const tag = document.createElement('div');
+            tag.className = 'name-tag';
+            tag.innerText = playerData.nickname;
+            document.body.appendChild(tag);
+
+            otherPlayers[playerData.id] = { group: remoteMesh.group, tag: tag };
+        }
+
+        window.addEventListener('keydown', (e) => {
+            if (!gameStarted) return;
+            if (e.code === 'KeyW' || e.code === 'ArrowUp') keys.forward = true;
+            if (e.code === 'KeyS' || e.code === 'ArrowDown') keys.backward = true;
+            if (e.code === 'KeyA' || e.code === 'ArrowLeft') keys.left = true;
+            if (e.code === 'KeyD' || e.code === 'ArrowRight') keys.right = true;
+            if (e.code === 'Space' && isGrounded) {
+                playerVelocity.y = jumpForce;
+                isGrounded = false;
+            }
+        });
+
+        window.addEventListener('keyup', (e) => {
+            if (!gameStarted) return;
+            if (e.code === 'KeyW' || e.code === 'ArrowUp') keys.forward = false;
+            if (e.code === 'KeyS' || e.code === 'ArrowDown') keys.backward = false;
+            if (e.code === 'KeyA' || e.code === 'ArrowLeft') keys.left = false;
+            if (e.code === 'KeyD' || e.code === 'ArrowRight') keys.right = false;
+        });
+
+        const tempVector = new THREE.Vector3();
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            if (gameStarted) {
+                let moveX = 0;
+                let moveZ = 0;
+
+                if (keys.forward) moveZ -= 1;
+                if (keys.backward) moveZ += 1;
+                if (keys.left) moveX -= 1;
+                if (keys.right) moveX += 1;
+
+                if (moveX !== 0 || moveZ !== 0) {
+                    const targetAngle = Math.atan2(moveX, moveZ);
+                    let currentAngle = myPlayer.group.rotation.y;
+                    let angleDiff = targetAngle - currentAngle;
+                    
+                    while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+                    while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+                    myPlayer.group.rotation.y += angleDiff * 0.15;
+
+                    myPlayer.group.position.x += moveX * playerSpeed;
+                    myPlayer.group.position.z += moveZ * playerSpeed;
+                    myPlayer.body.position.y = 0.75 + Math.abs(Math.sin(Date.now() * 0.015)) * 0.2;
+
+                    socket.emit('playerUpdate', {
+                        x: myPlayer.group.position.x,
+                        y: myPlayer.group.position.y,
+                        z: myPlayer.group.position.z,
+                        rotationY: myPlayer.group.rotation.y
+                    });
+                } else {
+                    myPlayer.body.position.y = 0.75;
+                }
+
+                playerVelocity.y -= gravity;
+                myPlayer.group.position.y += playerVelocity.y;
+
+                if (myPlayer.group.position.y <= 0) {
+                    myPlayer.group.position.y = 0;
+                    playerVelocity.y = 0;
+                    isGrounded = true;
+                }
+
+                camera.position.lerp(new THREE.Vector3(
+                    myPlayer.group.position.x,
+                    myPlayer.group.position.y + 4,
+                    myPlayer.group.position.z + 7
+                ), 0.1);
+                camera.lookAt(myPlayer.group.position.x, myPlayer.group.position.y + 1, myPlayer.group.position.z);
+
+                updateTagPosition(myPlayer.group, myNameTag, 1.8);
+
+                Object.keys(otherPlayers).forEach(id => {
+                    updateTagPosition(otherPlayers[id].group, otherPlayers[id].tag, 1.8);
+                });
+            }
+
+            renderer.render(scene, camera);
+        }
+
+        function updateTagPosition(targetGroup, tagElem, yOffset) {
+            targetGroup.getWorldPosition(tempVector);
+            tempVector.y += yOffset;
+            tempVector.project(camera);
+
+            const x = (tempVector.x * 0.5 + 0.5) * window.innerWidth;
+            const y = (-(tempVector.y * 0.5) + 0.5) * window.innerHeight;
+
+            if (tempVector.z < 1) {
+                tagElem.style.display = 'block';
+                tagElem.style.left = `${x}px`;
+                tagElem.style.top = `${y}px`;
+            } else {
+                tagElem.style.display = 'none';
+            }
+        }
+
+        animate();
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+    </script>
+</body>
+</html>`);
+});
+
 const players = {};
 
 io.on('connection', (socket) => {
-    console.log(`플레이어 접속: ${socket.id}`);
-
-    // 게임 입장 처리
     socket.on('joinGame', (data) => {
         players[socket.id] = {
             id: socket.id,
             nickname: data.nickname || '네모',
-            x: 0,
-            y: 0,
-            z: 0,
-            rotationY: 0
+            x: 0, y: 0, z: 0, rotationY: 0
         };
-
-        // 기존 플레이어 목록 전송
         socket.emit('currentPlayers', players);
-
-        // 다른 플레이어들에게 새 플레이어 알림
         socket.broadcast.emit('newPlayer', players[socket.id]);
     });
 
-    // 위치 업데이트 처리
     socket.on('playerUpdate', (data) => {
         if (players[socket.id]) {
             players[socket.id].x = data.x;
             players[socket.id].y = data.y;
             players[socket.id].z = data.z;
             players[socket.id].rotationY = data.rotationY;
-
-            // 위치 변경 사항 동기화
             socket.broadcast.emit('playerMoved', players[socket.id]);
         }
     });
 
-    // 퇴장 처리
     socket.on('disconnect', () => {
-        console.log(`플레이어 퇴장: ${socket.id}`);
         delete players[socket.id];
         io.emit('playerDisconnected', socket.id);
     });
