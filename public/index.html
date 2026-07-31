@@ -68,7 +68,7 @@
     <div id="start-screen">
         <div class="modal-box">
             <h2>🔐 알고리즘 방탈출</h2>
-            <p style="color: #666; font-size: 13px; margin-bottom: 15px;">협동하여 정렬 규칙 퍼즐을 풀고 탈출하세요!</p>
+            <p style="color: #666; font-size: 13px; margin-bottom: 15px;">스위치를 밟아 잠금을 풀고 정렬 퍼즐을 해결하세요!</p>
             <input type="text" id="room-input" value="알고리즘1방" placeholder="방 이름">
             <input type="text" id="nickname-input" value="개발자네모" maxlength="10" placeholder="닉네임">
             <div class="color-picker-wrapper">
@@ -80,8 +80,8 @@
     </div>
 
     <div id="instructions">
-        <strong>마우스 드래그</strong>: 자유 시점 회전 | <strong>WASD</strong>: 이동 (정방향 일치)<br>
-        협동 스위치 2개를 모두 밟아야 콘솔이 활성화됩니다!
+        <strong>마우스 드래그</strong>: 자유 시점 회전 | <strong>WASD</strong>: 이동<br>
+        바닥의 빨간 스위치를 밟으면 정렬 콘솔이 활성화됩니다!
     </div>
 
     <div id="puzzle-ui">
@@ -106,8 +106,9 @@
         let puzzleData = { type: 'bubble', numbers: [3,1,4,2], answer: [1,2,3,4] };
         let currentArray = [];
         let selectedIndex = null;
-        let switchStates = { 1: false, 2: false };
+        let switchActivated = false;
         const otherPlayers = {};
+        let blockMeshes = [];
 
         const startScreen = document.getElementById('start-screen');
         const startBtn = document.getElementById('start-btn');
@@ -118,22 +119,46 @@
         const myNameTag = document.getElementById('my-name-tag');
         const puzzleUi = document.getElementById('puzzle-ui');
 
+        // 3D 공간에 정렬할 숫자 블록들 생성
+        const blockGroup = new THREE.Group();
+        blockGroup.position.set(0, 1.5, -10);
+
+        function update3DBlocks() {
+            // 기존 블록 제거
+            while(blockGroup.children.length > 0){ 
+                blockGroup.remove(blockGroup.children[0]); 
+            }
+
+            currentArray.forEach((num, idx) => {
+                const boxGeo = new THREE.BoxGeometry(1.2, 1.2, 1.2);
+                const boxMat = new THREE.MeshStandardMaterial({ 
+                    color: selectedIndex === idx ? 0xe67e22 : 0x3498db,
+                    roughness: 0.3
+                });
+                const mesh = new THREE.Mesh(boxGeo, boxMat);
+                mesh.position.set((idx - 1.5) * 1.5, 0, 0);
+                mesh.castShadow = true;
+                blockGroup.add(mesh);
+            });
+        }
+
         function setupPuzzleUI() {
             currentArray = [...puzzleData.numbers];
             selectedIndex = null;
             renderPuzzleButtons();
+            update3DBlocks();
 
             let descText = "";
             let titleText = "";
             if (puzzleData.type === 'bubble') {
                 titleText = "🫧 버블 정렬 (Bubble Sort)";
-                descText = "인접한 두 숫자를 클릭하여 서로 자리를 교환(Swap)해 오름차순으로 만드세요!";
+                descText = "인접한 두 숫자를 클릭하여 서로 교환(Swap)해 오름차순으로 만드세요!";
             } else if (puzzleData.type === 'selection') {
                 titleText = "🎯 선택 정렬 (Selection Sort)";
                 descText = "숫자 두 개를 선택하여 위치를 바꾸며 오름차순 정렬을 완성하세요!";
             } else {
                 titleText = "📥 삽입 정렬 (Insertion Sort)";
-                descText = "원하는 숫자를 선택한 뒤 이동할 위치의 숫자를 클릭해 순서를 맞추세요!";
+                descText = "원하는 숫자를 선택한 뒤 교환할 숫자를 클릭해 순서를 맞추세요!";
             }
             document.getElementById('puzzle-title').innerText = titleText;
             document.getElementById('puzzle-desc').innerText = descText;
@@ -149,11 +174,11 @@
                 btn.onclick = () => handleNumberClick(idx);
                 container.appendChild(btn);
             });
+            update3DBlocks();
         }
 
         function handleNumberClick(idx) {
             if (puzzleData.type === 'bubble') {
-                // 버블 정렬: 인접한 두 칸만 교환 가능
                 if (selectedIndex === null) {
                     selectedIndex = idx;
                 } else {
@@ -167,7 +192,6 @@
                     selectedIndex = null;
                 }
             } else {
-                // 선택/삽입 정렬 등 일반 교환 모드
                 if (selectedIndex === null) {
                     selectedIndex = idx;
                 } else {
@@ -194,6 +218,7 @@
         const scene = new THREE.Scene();
         scene.background = new THREE.Color(0x181818);
         scene.fog = new THREE.Fog(0x181818, 20, 55);
+        scene.add(blockGroup);
 
         const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
         const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -223,15 +248,11 @@
             w.position.set(0, 6, z); scene.add(w);
         });
 
-        const plateMat1 = new THREE.MeshStandardMaterial({ color: 0xe74c3c });
-        const plateMat2 = new THREE.MeshStandardMaterial({ color: 0xe74c3c });
-        const switch1 = new THREE.Mesh(new THREE.BoxGeometry(3, 0.2, 3), plateMat1);
-        switch1.position.set(-8, 0.1, 5);
-        scene.add(switch1);
-
-        const switch2 = new THREE.Mesh(new THREE.BoxGeometry(3, 0.2, 3), plateMat2);
-        switch2.position.set(8, 0.1, 5);
-        scene.add(switch2);
+        // 압력판 스위치 (중앙 앞쪽)
+        const plateMat = new THREE.MeshStandardMaterial({ color: 0xe74c3c });
+        const switchPlate = new THREE.Mesh(new THREE.BoxGeometry(3.5, 0.2, 3.5), plateMat);
+        switchPlate.position.set(0, 0.1, 3);
+        scene.add(switchPlate);
 
         const door = new THREE.Mesh(new THREE.BoxGeometry(5, 8, 0.6), new THREE.MeshStandardMaterial({ color: 0xd35400 }));
         door.position.set(0, 4, 17.7);
@@ -316,13 +337,13 @@
                     puzzleData.answer = [...state.numbers].sort((a,b)=>a-b);
                     setupPuzzleUI();
                 }
-                switchStates = state.switches;
-                updateSwitchColors();
+                switchActivated = state.switchActivated;
+                if(switchActivated) plateMat.color.set(0x2ecc71);
             });
 
-            socket.on('switchStateUpdate', (states) => {
-                switchStates = states;
-                updateSwitchColors();
+            socket.on('switchActivatedUpdate', (activated) => {
+                switchActivated = activated;
+                plateMat.color.set(0x2ecc71);
             });
 
             socket.on('currentPlayers', (players) => {
@@ -358,7 +379,7 @@
             });
 
             socket.on('puzzleFailed', () => {
-                alert('❌ 정렬이 아직 완료되지 않았거나 틀렸습니다! 오름차순(작은 순서)으로 정확히 맞춰주세요.');
+                alert('❌ 정렬 순서가 틀렸습니다! 오름차순(작은 순서)으로 다시 맞춰보세요.');
             });
 
             startScreen.style.display = 'none';
@@ -378,11 +399,6 @@
             document.body.appendChild(tag);
 
             otherPlayers[data.id] = { group: mesh.group, tag: tag };
-        }
-
-        function updateSwitchColors() {
-            plateMat1.color.set(switchStates[1] ? 0x2ecc71 : 0xe74c3c);
-            plateMat2.color.set(switchStates[2] ? 0x2ecc71 : 0xe74c3c);
         }
 
         window.addEventListener('keydown', (e) => {
@@ -414,11 +430,9 @@
             requestAnimationFrame(animate);
 
             if (gameStarted && myPlayer) {
-                // 카메라 방향 기준 정방향 이동 벡터 계산
                 camera.getWorldDirection(forwardVector);
                 forwardVector.y = 0;
                 forwardVector.normalize();
-
                 rightVector.set(-forwardVector.z, 0, forwardVector.x);
 
                 moveDir.set(0, 0, 0);
@@ -457,21 +471,16 @@
                 }
 
                 const pos = myPlayer.group.position;
-                const onSwitch1 = Math.abs(pos.x - (-8)) < 1.8 && Math.abs(pos.z - 5) < 1.8;
-                const onSwitch2 = Math.abs(pos.x - 8) < 1.8 && Math.abs(pos.z - 5) < 1.8;
+                const onSwitch = Math.abs(pos.x - 0) < 2 && Math.abs(pos.z - 3) < 2;
 
-                if (onSwitch1 !== switchStates[1]) {
-                    socket.emit('updateSwitch', { switchId: 1, pressed: onSwitch1 });
-                }
-                if (onSwitch2 !== switchStates[2]) {
-                    socket.emit('updateSwitch', { switchId: 2, pressed: onSwitch2 });
+                if (onSwitch && !switchActivated) {
+                    socket.emit('activateSwitch');
                 }
 
-                const bothPressed = switchStates[1] && switchStates[2];
                 const distToConsole = pos.distanceTo(new THREE.Vector3(0, 0, -12));
-                if (distToConsole < 3.5 && bothPressed && !roomSolved) {
+                if (distToConsole < 3.5 && switchActivated && !roomSolved) {
                     puzzleUi.style.display = 'block';
-                } else if (!bothPressed || distToConsole >= 3.5) {
+                } else if (!switchActivated || distToConsole >= 3.5) {
                     puzzleUi.style.display = 'none';
                 }
 
