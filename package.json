@@ -1,7 +1,6 @@
 {
   "name": "square-3d-multiplayer",
   "version": "1.0.0",
-  "description": "Render용 3D 네모 멀티플레이어 게임",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
