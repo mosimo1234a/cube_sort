@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>알고리즘 방탈출 멀티플레이어</title>
+    <title>알고리즘 방탈출 멀티플레이어 (10스테이지)</title>
     <style>
         body {
             margin: 0;
@@ -18,6 +18,11 @@
             color: white; background: rgba(0, 0, 0, 0.8); padding: 10px 20px;
             border-radius: 20px; font-size: 13px; pointer-events: none; text-align: center;
             box-shadow: 0 4px 6px rgba(0,0,0,0.3); display: none; z-index: 5;
+        }
+        #stage-indicator {
+            position: absolute; top: 20px; left: 20px; color: #f1c40f; background: rgba(0, 0, 0, 0.8);
+            padding: 10px 15px; border-radius: 10px; font-size: 16px; font-weight: bold; display: none; z-index: 5;
+            border: 2px solid #f1c40f; box-shadow: 0 4px 6px rgba(0,0,0,0.3);
         }
         #start-screen {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
@@ -67,9 +72,9 @@
 <body>
     <div id="start-screen">
         <div class="modal-box">
-            <h2>🔐 알고리즘 방탈출</h2>
-            <p style="color: #666; font-size: 13px; margin-bottom: 15px;">스위치를 밟아 잠금을 풀고 정렬 퍼즐을 해결하세요!</p>
-            <input type="text" id="room-input" value="알고리즘1방" placeholder="방 이름">
+            <h2>🔐 알고리즘 10스테이지 탈출</h2>
+            <p style="color: #666; font-size: 13px; margin-bottom: 15px;">총 10개의 정렬 퍼즐을 돌파하여 탈출하세요!</p>
+            <input type="text" id="room-input" value="알고리즘방" placeholder="방 이름">
             <input type="text" id="nickname-input" value="개발자네모" maxlength="10" placeholder="닉네임">
             <div class="color-picker-wrapper">
                 <label for="color-input">내 색상:</label>
@@ -79,9 +84,10 @@
         </div>
     </div>
 
+    <div id="stage-indicator">스테이지: 1 / 10</div>
     <div id="instructions">
         <strong>마우스 드래그</strong>: 자유 시점 회전 | <strong>WASD</strong>: 이동<br>
-        바닥의 빨간 스위치를 밟으면 정렬 콘솔이 활성화됩니다!
+        바닥의 빨간 스위치를 밟아 콘솔을 활성화하세요!
     </div>
 
     <div id="puzzle-ui">
@@ -102,13 +108,14 @@
     <script>
         let gameStarted = false;
         let socket;
-        let roomSolved = false;
+        let currentStage = 1;
+        let maxStages = 10;
+        let gameCleared = false;
         let puzzleData = { type: 'bubble', numbers: [3,1,4,2], answer: [1,2,3,4] };
         let currentArray = [];
         let selectedIndex = null;
         let switchActivated = false;
         const otherPlayers = {};
-        let blockMeshes = [];
 
         const startScreen = document.getElementById('start-screen');
         const startBtn = document.getElementById('start-btn');
@@ -116,19 +123,17 @@
         const nicknameInput = document.getElementById('nickname-input');
         const colorInput = document.getElementById('color-input');
         const instructions = document.getElementById('instructions');
+        const stageIndicator = document.getElementById('stage-indicator');
         const myNameTag = document.getElementById('my-name-tag');
         const puzzleUi = document.getElementById('puzzle-ui');
 
-        // 3D 공간에 정렬할 숫자 블록들 생성
         const blockGroup = new THREE.Group();
         blockGroup.position.set(0, 1.5, -10);
 
         function update3DBlocks() {
-            // 기존 블록 제거
             while(blockGroup.children.length > 0){ 
                 blockGroup.remove(blockGroup.children[0]); 
             }
-
             currentArray.forEach((num, idx) => {
                 const boxGeo = new THREE.BoxGeometry(1.2, 1.2, 1.2);
                 const boxMat = new THREE.MeshStandardMaterial({ 
@@ -151,17 +156,18 @@
             let descText = "";
             let titleText = "";
             if (puzzleData.type === 'bubble') {
-                titleText = "🫧 버블 정렬 (Bubble Sort)";
+                titleText = `🫧 버블 정렬 (스테이지 ${currentStage})`;
                 descText = "인접한 두 숫자를 클릭하여 서로 교환(Swap)해 오름차순으로 만드세요!";
             } else if (puzzleData.type === 'selection') {
-                titleText = "🎯 선택 정렬 (Selection Sort)";
+                titleText = `🎯 선택 정렬 (스테이지 ${currentStage})`;
                 descText = "숫자 두 개를 선택하여 위치를 바꾸며 오름차순 정렬을 완성하세요!";
             } else {
-                titleText = "📥 삽입 정렬 (Insertion Sort)";
+                titleText = `📥 삽입 정렬 (스테이지 ${currentStage})`;
                 descText = "원하는 숫자를 선택한 뒤 교환할 숫자를 클릭해 순서를 맞추세요!";
             }
             document.getElementById('puzzle-title').innerText = titleText;
             document.getElementById('puzzle-desc').innerText = descText;
+            stageIndicator.innerText = `스테이지: ${currentStage} / ${maxStages}`;
         }
 
         function renderPuzzleButtons() {
@@ -214,7 +220,6 @@
             socket.emit('submitPuzzle', currentArray);
         }
 
-        // 3D 씬 구성
         const scene = new THREE.Scene();
         scene.background = new THREE.Color(0x181818);
         scene.fog = new THREE.Fog(0x181818, 20, 55);
@@ -248,7 +253,6 @@
             w.position.set(0, 6, z); scene.add(w);
         });
 
-        // 압력판 스위치 (중앙 앞쪽)
         const plateMat = new THREE.MeshStandardMaterial({ color: 0xe74c3c });
         const switchPlate = new THREE.Mesh(new THREE.BoxGeometry(3.5, 0.2, 3.5), plateMat);
         switchPlate.position.set(0, 0.1, 3);
@@ -329,8 +333,11 @@
             socket.emit('joinRoom', { roomId, nickname, color: selectedColor });
 
             socket.on('roomState', (state) => {
-                roomSolved = state.isSolved;
-                if (roomSolved) door.position.y = -15;
+                currentStage = state.stage;
+                maxStages = state.maxStages;
+                gameCleared = state.isGameCleared;
+                if (gameCleared) door.position.y = -15;
+
                 if (state.puzzleType) {
                     puzzleData.type = state.puzzleType;
                     puzzleData.numbers = state.numbers;
@@ -338,12 +345,32 @@
                     setupPuzzleUI();
                 }
                 switchActivated = state.switchActivated;
-                if(switchActivated) plateMat.color.set(0x2ecc71);
+                plateMat.color.set(switchActivated ? 0x2ecc71 : 0xe74c3c);
             });
 
             socket.on('switchActivatedUpdate', (activated) => {
                 switchActivated = activated;
                 plateMat.color.set(0x2ecc71);
+            });
+
+            socket.on('nextStage', (data) => {
+                currentStage = data.stage;
+                puzzleData.type = data.puzzleType;
+                puzzleData.numbers = data.numbers;
+                puzzleData.answer = [...data.numbers].sort((a,b)=>a-b);
+                switchActivated = false;
+                plateMat.color.set(0xe74c3c);
+                setupPuzzleUI();
+                puzzleUi.style.display = 'none';
+                alert(`🎉 스테이지 클리어! 다음 스테이지(${currentStage}/10)로 진입합니다!`);
+            });
+
+            socket.on('gameCleared', () => {
+                gameCleared = true;
+                door.position.y = -15;
+                puzzleUi.style.display = 'none';
+                stageIndicator.style.display = 'none';
+                alert('🏆 축하합니다! 모든 10개의 정렬 스테이지를 클리어하고 최종 탈출에 성공했습니다!');
             });
 
             socket.on('currentPlayers', (players) => {
@@ -371,19 +398,13 @@
                 }
             });
 
-            socket.on('puzzleSolved', () => {
-                roomSolved = true;
-                door.position.y = -15;
-                puzzleUi.style.display = 'none';
-                alert('🎉 정렬 완료! 탈출구 문이 열렸습니다!');
-            });
-
             socket.on('puzzleFailed', () => {
                 alert('❌ 정렬 순서가 틀렸습니다! 오름차순(작은 순서)으로 다시 맞춰보세요.');
             });
 
             startScreen.style.display = 'none';
             instructions.style.display = 'block';
+            stageIndicator.style.display = 'block';
             myNameTag.style.display = 'block';
             gameStarted = true;
         });
@@ -478,7 +499,7 @@
                 }
 
                 const distToConsole = pos.distanceTo(new THREE.Vector3(0, 0, -12));
-                if (distToConsole < 3.5 && switchActivated && !roomSolved) {
+                if (distToConsole < 3.5 && switchActivated && !gameCleared) {
                     puzzleUi.style.display = 'block';
                 } else if (!switchActivated || distToConsole >= 3.5) {
                     puzzleUi.style.display = 'none';
