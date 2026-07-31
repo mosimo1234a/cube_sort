@@ -3,31 +3,34 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>알고리즘 방탈출 멀티플레이어 (10스테이지)</title>
+    <title>귀여운 네모 아레나 TPS</title>
     <style>
         body {
             margin: 0;
             overflow: hidden;
             background-color: #111;
             font-family: 'Arial', sans-serif;
-            cursor: grab;
+            user-select: none;
         }
-        body:active { cursor: grabbing; }
+        #crosshair {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            color: rgba(255, 255, 255, 0.7); font-size: 24px; pointer-events: none; display: none; z-index: 5;
+        }
+        #hud {
+            position: absolute; top: 20px; left: 20px; color: white; background: rgba(0, 0, 0, 0.7);
+            padding: 12px 18px; border-radius: 12px; font-size: 14px; display: none; z-index: 5;
+            border: 2px solid #e67e22; box-shadow: 0 4px 6px rgba(0,0,0,0.3); pointer-events: none;
+        }
         #instructions {
-            position: absolute; top: 20px; left: 50%; transform: translateX(-50%);
+            position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
             color: white; background: rgba(0, 0, 0, 0.8); padding: 10px 20px;
             border-radius: 20px; font-size: 13px; pointer-events: none; text-align: center;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.3); display: none; z-index: 5;
-        }
-        #stage-indicator {
-            position: absolute; top: 20px; left: 20px; color: #f1c40f; background: rgba(0, 0, 0, 0.8);
-            padding: 10px 15px; border-radius: 10px; font-size: 16px; font-weight: bold; display: none; z-index: 5;
-            border: 2px solid #f1c40f; box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            display: none; z-index: 5; box-shadow: 0 4px 6px rgba(0,0,0,0.3);
         }
         #start-screen {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(0, 0, 0, 0.9); display: flex; justify-content: center;
-            align-items: center; z-index: 10; cursor: default;
+            align-items: center; z-index: 10;
         }
         .modal-box {
             background: #fff; padding: 30px 40px; border-radius: 20px; text-align: center;
@@ -54,52 +57,28 @@
             display: none; box-shadow: 0 2px 4px rgba(0,0,0,0.3);
         }
         .my-tag { background: rgba(230, 126, 34, 0.9); }
-        #puzzle-ui {
-            position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%);
-            background: rgba(15, 15, 15, 0.95); padding: 20px; border-radius: 15px;
-            color: white; display: none; text-align: center; z-index: 5;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.7); border: 2px solid #e67e22; width: 420px;
-        }
-        .sort-btn {
-            padding: 12px 18px; margin: 5px; background: #34495e; color: white;
-            border: 2px solid #4e6d8c; border-radius: 8px; font-size: 18px; font-weight: bold; cursor: pointer;
-            transition: all 0.2s;
-        }
-        .sort-btn:hover { background: #2980b9; border-color: #3498db; }
-        .sort-btn.selected { background: #e67e22; border-color: #f39c12; }
     </style>
 </head>
 <body>
     <div id="start-screen">
         <div class="modal-box">
-            <h2>🔐 알고리즘 10스테이지 탈출</h2>
-            <p style="color: #666; font-size: 13px; margin-bottom: 15px;">총 10개의 정렬 퍼즐을 돌파하여 탈출하세요!</p>
-            <input type="text" id="room-input" value="알고리즘방" placeholder="방 이름">
-            <input type="text" id="nickname-input" value="개발자네모" maxlength="10" placeholder="닉네임">
+            <h2>🎯 네모 아레나 TPS</h2>
+            <p style="color: #666; font-size: 13px; margin-bottom: 15px;">귀여운 네모 캐릭터들의 난투전!</p> 엄폐물을 활용해 승리하세요.
+            <input type="text" id="room-input" value="아레나1" placeholder="방 이름">
+            <input type="text" id="nickname-input" value="총잡이네모" maxlength="10" placeholder="닉네임">
             <div class="color-picker-wrapper">
-                <label for="color-input">내 색상:</label>
+                <label for="color-input">내 캐릭터 색상:</label>
                 <input type="color" id="color-input" value="#e67e22">
             </div>
-            <button id="start-btn">입장하기</button>
+            <button id="start-btn">전장 입장</button>
         </div>
     </div>
 
-    <div id="stage-indicator">스테이지: 1 / 10</div>
+    <div id="crosshair">+</div>
+    <div id="hud">내 체력: <span id="my-hp" style="color:#2ecc71; font-weight:bold;">100</span> | 점수: <span id="my-score" style="color:#f1c40f; font-weight:bold;">0</span></div>
     <div id="instructions">
-        <strong>마우스 드래그</strong>: 자유 시점 회전 | <strong>WASD</strong>: 이동<br>
-        바닥의 빨간 스위치를 밟아 콘솔을 활성화하세요!
+        <strong>마우스 드래그</strong>: 시점 회전 | <strong>WASD</strong>: 이동 | <strong>SPACE</strong>: 점프 | <strong>좌클릭</strong>: 총알 발사!
     </div>
-
-    <div id="puzzle-ui">
-        <h3 id="puzzle-title" style="margin:0 0 6px 0; color:#f1c40f;">정렬 알고리즘 퍼즐</h3>
-        <p id="puzzle-desc" style="font-size:12px; color:#bbb; margin:0 0 12px 0; line-height: 1.4;">규칙에 맞춰 정렬하세요!</p>
-        <div id="number-container" style="margin-bottom: 15px;"></div>
-        <div>
-            <button onclick="submitPuzzle()" style="background:#27ae60; color:white; padding:8px 16px; border:none; border-radius:6px; cursor:pointer; font-weight:bold;">정답 제출</button>
-            <button onclick="resetPuzzle()" style="background:#c0392b; color:white; padding:8px 16px; border:none; border-radius:6px; cursor:pointer; font-weight:bold;">초기화</button>
-        </div>
-    </div>
-
     <div id="my-name-tag" class="name-tag my-tag"></div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -108,14 +87,10 @@
     <script>
         let gameStarted = false;
         let socket;
-        let currentStage = 1;
-        let maxStages = 10;
-        let gameCleared = false;
-        let puzzleData = { type: 'bubble', numbers: [3,1,4,2], answer: [1,2,3,4] };
-        let currentArray = [];
-        let selectedIndex = null;
-        let switchActivated = false;
+        let myHp = 100;
+        let myScore = 0;
         const otherPlayers = {};
+        const activeBullets = [];
 
         const startScreen = document.getElementById('start-screen');
         const startBtn = document.getElementById('start-btn');
@@ -123,149 +98,63 @@
         const nicknameInput = document.getElementById('nickname-input');
         const colorInput = document.getElementById('color-input');
         const instructions = document.getElementById('instructions');
-        const stageIndicator = document.getElementById('stage-indicator');
+        const hud = document.getElementById('hud');
+        const crosshair = document.getElementById('crosshair');
         const myNameTag = document.getElementById('my-name-tag');
-        const puzzleUi = document.getElementById('puzzle-ui');
+        const myHpSpan = document.getElementById('my-hp');
+        const myScoreSpan = document.getElementById('my-score');
 
-        const blockGroup = new THREE.Group();
-        blockGroup.position.set(0, 1.5, -10);
-
-        function update3DBlocks() {
-            while(blockGroup.children.length > 0){ 
-                blockGroup.remove(blockGroup.children[0]); 
-            }
-            currentArray.forEach((num, idx) => {
-                const boxGeo = new THREE.BoxGeometry(1.2, 1.2, 1.2);
-                const boxMat = new THREE.MeshStandardMaterial({ 
-                    color: selectedIndex === idx ? 0xe67e22 : 0x3498db,
-                    roughness: 0.3
-                });
-                const mesh = new THREE.Mesh(boxGeo, boxMat);
-                mesh.position.set((idx - 1.5) * 1.5, 0, 0);
-                mesh.castShadow = true;
-                blockGroup.add(mesh);
-            });
-        }
-
-        function setupPuzzleUI() {
-            currentArray = [...puzzleData.numbers];
-            selectedIndex = null;
-            renderPuzzleButtons();
-            update3DBlocks();
-
-            let descText = "";
-            let titleText = "";
-            if (puzzleData.type === 'bubble') {
-                titleText = `🫧 버블 정렬 (스테이지 ${currentStage})`;
-                descText = "인접한 두 숫자를 클릭하여 서로 교환(Swap)해 오름차순으로 만드세요!";
-            } else if (puzzleData.type === 'selection') {
-                titleText = `🎯 선택 정렬 (스테이지 ${currentStage})`;
-                descText = "숫자 두 개를 선택하여 위치를 바꾸며 오름차순 정렬을 완성하세요!";
-            } else {
-                titleText = `📥 삽입 정렬 (스테이지 ${currentStage})`;
-                descText = "원하는 숫자를 선택한 뒤 교환할 숫자를 클릭해 순서를 맞추세요!";
-            }
-            document.getElementById('puzzle-title').innerText = titleText;
-            document.getElementById('puzzle-desc').innerText = descText;
-            stageIndicator.innerText = `스테이지: ${currentStage} / ${maxStages}`;
-        }
-
-        function renderPuzzleButtons() {
-            const container = document.getElementById('number-container');
-            container.innerHTML = '';
-            currentArray.forEach((num, idx) => {
-                const btn = document.createElement('button');
-                btn.className = 'sort-btn' + (selectedIndex === idx ? ' selected' : '');
-                btn.innerText = num;
-                btn.onclick = () => handleNumberClick(idx);
-                container.appendChild(btn);
-            });
-            update3DBlocks();
-        }
-
-        function handleNumberClick(idx) {
-            if (puzzleData.type === 'bubble') {
-                if (selectedIndex === null) {
-                    selectedIndex = idx;
-                } else {
-                    if (Math.abs(selectedIndex - idx) === 1) {
-                        let temp = currentArray[selectedIndex];
-                        currentArray[selectedIndex] = currentArray[idx];
-                        currentArray[idx] = temp;
-                    } else {
-                        alert('버블 정렬은 바로 옆에 있는 인접한 숫자끼리만 교환할 수 있습니다!');
-                    }
-                    selectedIndex = null;
-                }
-            } else {
-                if (selectedIndex === null) {
-                    selectedIndex = idx;
-                } else {
-                    let temp = currentArray[selectedIndex];
-                    currentArray[selectedIndex] = currentArray[idx];
-                    currentArray[idx] = temp;
-                    selectedIndex = null;
-                }
-            }
-            renderPuzzleButtons();
-        }
-
-        function resetPuzzle() {
-            currentArray = [...puzzleData.numbers];
-            selectedIndex = null;
-            renderPuzzleButtons();
-        }
-
-        function submitPuzzle() {
-            socket.emit('submitPuzzle', currentArray);
-        }
-
+        // 3D 씬 구성
         const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x181818);
-        scene.fog = new THREE.Fog(0x181818, 20, 55);
-        scene.add(blockGroup);
+        scene.background = new THREE.Color(0x1a1a1a);
+        scene.fog = new THREE.Fog(0x1a1a1a, 25, 60);
 
         const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
         renderer.shadowMap.enabled = true;
-        renderer.outputEncoding = THREE.sRGBEncoding;
         document.body.appendChild(renderer.domElement);
 
         scene.add(new THREE.AmbientLight(0xffffff, 0.6));
         const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
-        dirLight.position.set(10, 25, 10);
+        dirLight.position.set(15, 30, 15);
         dirLight.castShadow = true;
         scene.add(dirLight);
 
-        const floor = new THREE.Mesh(new THREE.PlaneGeometry(36, 36), new THREE.MeshStandardMaterial({ color: 0x2c3e50, roughness: 0.8 }));
+        // 아레나 바닥
+        const floor = new THREE.Mesh(
+            new THREE.PlaneGeometry(50, 50),
+            new THREE.MeshStandardMaterial({ color: 0x2c3e50, roughness: 0.8 })
+        );
         floor.rotation.x = -Math.PI / 2;
         floor.receiveShadow = true;
         scene.add(floor);
 
+        // 아레나 외곽 벽 및 엄폐물 박스들
         const wallMat = new THREE.MeshStandardMaterial({ color: 0x34495e, roughness: 0.7 });
-        [-18, 18].forEach(x => {
-            const w = new THREE.Mesh(new THREE.BoxGeometry(1, 12, 36), wallMat);
-            w.position.set(x, 6, 0); scene.add(w);
+        [-25, 25].forEach(x => {
+            const w = new THREE.Mesh(new THREE.BoxGeometry(1, 10, 50), wallMat);
+            w.position.set(x, 5, 0); scene.add(w);
         });
-        [-18, 18].forEach(z => {
-            const w = new THREE.Mesh(new THREE.BoxGeometry(36, 12, 1), wallMat);
-            w.position.set(0, 6, z); scene.add(w);
+        [-25, 25].forEach(z => {
+            const w = new THREE.Mesh(new THREE.BoxGeometry(50, 10, 1), wallMat);
+            w.position.set(0, 5, z); scene.add(w);
         });
 
-        const plateMat = new THREE.MeshStandardMaterial({ color: 0xe74c3c });
-        const switchPlate = new THREE.Mesh(new THREE.BoxGeometry(3.5, 0.2, 3.5), plateMat);
-        switchPlate.position.set(0, 0.1, 3);
-        scene.add(switchPlate);
+        // 엄폐용 장애물 생성
+        const obstacleGeo = new THREE.BoxGeometry(4, 3, 4);
+        const obstacleMat = new THREE.MeshStandardMaterial({ color: 0x7f8c8d, roughness: 0.5 });
+        const obstacles = [];
+        [[ -10, -10 ], [ 10, 10 ], [ -10, 10 ], [ 10, -10 ], [ 0, -15 ]].forEach(pos => {
+            const obs = new THREE.Mesh(obstacleGeo, obstacleMat);
+            obs.position.set(pos[0], 1.5, pos[1]);
+            obs.castShadow = true;
+            obs.receiveShadow = true;
+            scene.add(obs);
+            obstacles.push(obs);
+        });
 
-        const door = new THREE.Mesh(new THREE.BoxGeometry(5, 8, 0.6), new THREE.MeshStandardMaterial({ color: 0xd35400 }));
-        door.position.set(0, 4, 17.7);
-        scene.add(door);
-
-        const consoleMesh = new THREE.Mesh(new THREE.BoxGeometry(2.5, 1.5, 1.2), new THREE.MeshStandardMaterial({ color: 0x7f8c8d }));
-        consoleMesh.position.set(0, 0.75, -12);
-        scene.add(consoleMesh);
-
+        // 네모 캐릭터 메쉬 생성 함수
         const bodyGeo = new THREE.BoxGeometry(1.5, 1.5, 1.5);
         const eyeGeo = new THREE.BoxGeometry(0.18, 0.18, 0.05);
         const eyeMat = new THREE.MeshBasicMaterial({ color: 0x222222 });
@@ -291,7 +180,7 @@
 
         let myPlayer;
         let playerVelocity = new THREE.Vector3();
-        const playerSpeed = 0.13;
+        const playerSpeed = 0.15;
         const gravity = 0.02;
         const jumpForce = 0.4;
         let isGrounded = false;
@@ -304,8 +193,13 @@
 
         window.addEventListener('mousedown', (e) => {
             if (!gameStarted) return;
-            isDragging = true;
-            prevMousePos = { x: e.clientX, y: e.clientY };
+            if (e.button === 0) {
+                // 좌클릭 슈팅
+                shootBullet();
+            } else {
+                isDragging = true;
+                prevMousePos = { x: e.clientX, y: e.clientY };
+            }
         });
 
         window.addEventListener('mousemove', (e) => {
@@ -319,10 +213,11 @@
         });
 
         window.addEventListener('mouseup', () => { isDragging = false; });
+        window.addEventListener('contextmenu', e => e.preventDefault()); // 우클릭 메뉴 방지
 
         startBtn.addEventListener('click', () => {
-            const roomId = roomInput.value.trim() || '알고리즘방';
-            const nickname = nicknameInput.value.trim() || '모험가';
+            const roomId = roomInput.value.trim() || '아레나1';
+            const nickname = nicknameInput.value.trim() || '용사';
             const selectedColor = colorInput.value;
             myNameTag.innerText = nickname;
 
@@ -331,47 +226,6 @@
 
             socket = io();
             socket.emit('joinRoom', { roomId, nickname, color: selectedColor });
-
-            socket.on('roomState', (state) => {
-                currentStage = state.stage;
-                maxStages = state.maxStages;
-                gameCleared = state.isGameCleared;
-                if (gameCleared) door.position.y = -15;
-
-                if (state.puzzleType) {
-                    puzzleData.type = state.puzzleType;
-                    puzzleData.numbers = state.numbers;
-                    puzzleData.answer = [...state.numbers].sort((a,b)=>a-b);
-                    setupPuzzleUI();
-                }
-                switchActivated = state.switchActivated;
-                plateMat.color.set(switchActivated ? 0x2ecc71 : 0xe74c3c);
-            });
-
-            socket.on('switchActivatedUpdate', (activated) => {
-                switchActivated = activated;
-                plateMat.color.set(0x2ecc71);
-            });
-
-            socket.on('nextStage', (data) => {
-                currentStage = data.stage;
-                puzzleData.type = data.puzzleType;
-                puzzleData.numbers = data.numbers;
-                puzzleData.answer = [...data.numbers].sort((a,b)=>a-b);
-                switchActivated = false;
-                plateMat.color.set(0xe74c3c);
-                setupPuzzleUI();
-                puzzleUi.style.display = 'none';
-                alert(`🎉 스테이지 클리어! 다음 스테이지(${currentStage}/10)로 진입합니다!`);
-            });
-
-            socket.on('gameCleared', () => {
-                gameCleared = true;
-                door.position.y = -15;
-                puzzleUi.style.display = 'none';
-                stageIndicator.style.display = 'none';
-                alert('🏆 축하합니다! 모든 10개의 정렬 스테이지를 클리어하고 최종 탈출에 성공했습니다!');
-            });
 
             socket.on('currentPlayers', (players) => {
                 Object.keys(players).forEach(id => {
@@ -390,6 +244,22 @@
                 }
             });
 
+            socket.on('playerShooting', (data) => {
+                createVisualBullet(data.x, data.y, data.z, data.dirX, data.dirY, data.dirZ, 0xe74c3c);
+            });
+
+            socket.on('updateStats', (players) => {
+                if (players[socket.id]) {
+                    myHp = players[socket.id].hp;
+                    myScore = players[socket.id].score;
+                    myHpSpan.innerText = myHp;
+                    myScoreSpan.innerText = myScore;
+                    if (myPlayer && myHp <= 100 && myHp > 0) {
+                        myPlayer.group.position.set(players[socket.id].x, players[socket.id].y, players[socket.id].z);
+                    }
+                }
+            });
+
             socket.on('playerDisconnected', (id) => {
                 if (otherPlayers[id]) {
                     scene.remove(otherPlayers[id].group);
@@ -398,13 +268,10 @@
                 }
             });
 
-            socket.on('puzzleFailed', () => {
-                alert('❌ 정렬 순서가 틀렸습니다! 오름차순(작은 순서)으로 다시 맞춰보세요.');
-            });
-
             startScreen.style.display = 'none';
             instructions.style.display = 'block';
-            stageIndicator.style.display = 'block';
+            hud.style.display = 'block';
+            crosshair.style.display = 'block';
             myNameTag.style.display = 'block';
             gameStarted = true;
         });
@@ -419,7 +286,40 @@
             tag.innerText = data.nickname;
             document.body.appendChild(tag);
 
-            otherPlayers[data.id] = { group: mesh.group, tag: tag };
+            otherPlayers[data.id] = { group: mesh.group, tag: tag, data: data };
+        }
+
+        const bulletGeo = new THREE.SphereGeometry(0.2, 8, 8);
+        
+        function shootBullet() {
+            if (!myPlayer) return;
+
+            const dir = new THREE.Vector3();
+            camera.getWorldDirection(dir);
+
+            const startPos = myPlayer.group.position.clone().add(new THREE.Vector3(0, 1, 0));
+
+            // 서버에 발사 알림
+            socket.emit('shoot', {
+                x: startPos.x, y: startPos.y, z: startPos.z,
+                dirX: dir.x, dirY: dir.y, dirZ: dir.z
+            });
+
+            createVisualBullet(startPos.x, startPos.y, startPos.z, dir.x, dir.y, dir.z, 0xf1c40f, true);
+        }
+
+        function createVisualBullet(x, y, z, dx, dy, dz, colorHex, isMine = false) {
+            const mat = new THREE.MeshBasicMaterial({ color: colorHex });
+            const bulletMesh = new THREE.Mesh(bulletGeo, mat);
+            bulletMesh.position.set(x, y, z);
+            scene.add(bulletMesh);
+
+            activeBullets.push({
+                mesh: bulletMesh,
+                dir: new THREE.Vector3(dx, dy, dz).normalize(),
+                life: 60, // 프레임 수명
+                isMine: isMine
+            });
         }
 
         window.addEventListener('keydown', (e) => {
@@ -467,11 +367,11 @@
                     const nx = myPlayer.group.position.x + moveDir.x * playerSpeed;
                     const nz = myPlayer.group.position.z + moveDir.z * playerSpeed;
 
-                    if (nx > -17 && nx < 17) myPlayer.group.position.x = nx;
-                    if (nz > -17 && nz < 17) myPlayer.group.position.z = nz;
+                    if (nx > -23 && nx < 23) myPlayer.group.position.x = nx;
+                    if (nz > -23 && nz < 23) myPlayer.group.position.z = nz;
 
                     myPlayer.group.rotation.y = Math.atan2(moveDir.x, moveDir.z);
-                    myPlayer.body.position.y = 0.75 + Math.abs(Math.sin(Date.now() * 0.015)) * 0.2;
+                    myPlayer.body.position.y = 0.75 + Math.abs(Math.sin(Date.now() * 0.02)) * 0.2;
 
                     socket.emit('playerUpdate', {
                         x: myPlayer.group.position.x,
@@ -491,20 +391,31 @@
                     isGrounded = true;
                 }
 
+                // 총알 이동 및 충돌 체크
+                for (let i = activeBullets.length - 1; i >= 0; i--) {
+                    const b = activeBullets[i];
+                    b.mesh.position.addScaledVector(b.dir, 0.8);
+                    b.life--;
+
+                    // 내 총알일 경우 다른 플레이어 피격 판정
+                    if (b.isMine) {
+                        Object.keys(otherPlayers).forEach(id => {
+                            const op = otherPlayers[id].group;
+                            if (op && b.mesh.position.distanceTo(op.position) < 1.5) {
+                                socket.emit('hitPlayer', id);
+                                b.life = 0; // 총알 소멸
+                            }
+                        });
+                    }
+
+                    if (b.life <= 0) {
+                        scene.remove(b.mesh);
+                        activeBullets.splice(i, 1);
+                    }
+                }
+
+                // 카메라 추적 (TPS 시점)
                 const pos = myPlayer.group.position;
-                const onSwitch = Math.abs(pos.x - 0) < 2 && Math.abs(pos.z - 3) < 2;
-
-                if (onSwitch && !switchActivated) {
-                    socket.emit('activateSwitch');
-                }
-
-                const distToConsole = pos.distanceTo(new THREE.Vector3(0, 0, -12));
-                if (distToConsole < 3.5 && switchActivated && !gameCleared) {
-                    puzzleUi.style.display = 'block';
-                } else if (!switchActivated || distToConsole >= 3.5) {
-                    puzzleUi.style.display = 'none';
-                }
-
                 const dist = 7;
                 const cx = pos.x + Math.sin(cameraAngleX) * dist * Math.cos(cameraAngleY);
                 const cy = pos.y + 2 + Math.sin(cameraAngleY) * dist;
