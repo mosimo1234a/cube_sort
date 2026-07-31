@@ -39,9 +39,11 @@ io.on('connection', (socket) => {
         if (!rooms[socket.roomId]) {
             rooms[socket.roomId] = {
                 players: {},
-                switchActivated: false, // 스위치 밟으면 영구 활성화
+                stage: 1,
+                maxStages: 10,
+                switchActivated: false,
                 puzzle: generatePuzzle(),
-                isSolved: false
+                isGameCleared: false
             };
         }
 
@@ -54,7 +56,9 @@ io.on('connection', (socket) => {
 
         socket.emit('currentPlayers', rooms[socket.roomId].players);
         socket.emit('roomState', {
-            isSolved: rooms[socket.roomId].isSolved,
+            stage: rooms[socket.roomId].stage,
+            maxStages: rooms[socket.roomId].maxStages,
+            isGameCleared: rooms[socket.roomId].isGameCleared,
             puzzleType: rooms[socket.roomId].puzzle.type,
             numbers: rooms[socket.roomId].puzzle.numbers,
             switchActivated: rooms[socket.roomId].switchActivated
@@ -86,12 +90,25 @@ io.on('connection', (socket) => {
     socket.on('submitPuzzle', (userAnswer) => {
         const roomId = socket.roomId;
         if (roomId && rooms[roomId]) {
-            const correctAns = rooms[roomId].puzzle.answer;
+            const room = rooms[roomId];
+            const correctAns = room.puzzle.answer;
             const isCorrect = userAnswer.length === correctAns.length && userAnswer.every((val, idx) => val === correctAns[idx]);
 
             if (isCorrect) {
-                rooms[roomId].isSolved = true;
-                io.to(roomId).emit('puzzleSolved');
+                room.stage++;
+                room.switchActivated = false; // 다음 스테이지를 위해 스위치 초기화
+
+                if (room.stage > room.maxStages) {
+                    room.isGameCleared = true;
+                    io.to(roomId).emit('gameCleared');
+                } else {
+                    room.puzzle = generatePuzzle();
+                    io.to(roomId).emit('nextStage', {
+                        stage: room.stage,
+                        puzzleType: room.puzzle.type,
+                        numbers: room.puzzle.numbers
+                    });
+                }
             } else {
                 socket.emit('puzzleFailed');
             }
