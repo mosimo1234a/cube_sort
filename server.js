@@ -13,57 +13,31 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 const rooms = {};
 
-function generatePuzzle() {
-    const types = ['bubble', 'selection', 'insertion'];
-    const type = types[Math.floor(Math.random() * types.length)];
-    
-    let numbers = [
-        Math.floor(Math.random() * 9) + 1,
-        Math.floor(Math.random() * 9) + 1,
-        Math.floor(Math.random() * 9) + 1,
-        Math.floor(Math.random() * 9) + 1
-    ];
-    
-    let answer = [...numbers].sort((a, b) => a - b);
-    return { type, numbers, answer };
-}
-
 io.on('connection', (socket) => {
     console.log(`플레이어 연결: ${socket.id}`);
 
     socket.on('joinRoom', (data) => {
         const { nickname, color, roomId } = data;
-        socket.roomId = roomId || 'default-room';
+        socket.roomId = roomId || 'tps-room';
         socket.join(socket.roomId);
 
         if (!rooms[socket.roomId]) {
-            rooms[socket.roomId] = {
-                players: {},
-                stage: 1,
-                maxStages: 10,
-                switchActivated: false,
-                puzzle: generatePuzzle(),
-                isGameCleared: false
-            };
+            rooms[socket.roomId] = { players: {} };
         }
 
         rooms[socket.roomId].players[socket.id] = {
             id: socket.id,
-            nickname: nickname || '모험가',
+            nickname: nickname || '용사',
             color: color || '#e67e22',
-            x: 0, y: 0, z: 0, rotationY: 0
+            x: (Math.random() - 0.5) * 10,
+            y: 0,
+            z: (Math.random() - 0.5) * 10,
+            rotationY: 0,
+            hp: 100,
+            score: 0
         };
 
         socket.emit('currentPlayers', rooms[socket.roomId].players);
-        socket.emit('roomState', {
-            stage: rooms[socket.roomId].stage,
-            maxStages: rooms[socket.roomId].maxStages,
-            isGameCleared: rooms[socket.roomId].isGameCleared,
-            puzzleType: rooms[socket.roomId].puzzle.type,
-            numbers: rooms[socket.roomId].puzzle.numbers,
-            switchActivated: rooms[socket.roomId].switchActivated
-        });
-
         socket.broadcast.to(socket.roomId).emit('newPlayer', rooms[socket.roomId].players[socket.id]);
     });
 
@@ -79,39 +53,36 @@ io.on('connection', (socket) => {
         }
     });
 
-    socket.on('activateSwitch', () => {
+    socket.on('shoot', (data) => {
         const roomId = socket.roomId;
-        if (roomId && rooms[roomId] && !rooms[roomId].switchActivated) {
-            rooms[roomId].switchActivated = true;
-            io.to(roomId).emit('switchActivatedUpdate', true);
+        if (roomId && rooms[roomId]) {
+            socket.broadcast.to(roomId).emit('playerShooting', {
+                id: socket.id,
+                x: data.x,
+                y: data.y,
+                z: data.z,
+                dirX: data.dirX,
+                dirY: data.dirY,
+                dirZ: data.dirZ
+            });
         }
     });
 
-    socket.on('submitPuzzle', (userAnswer) => {
+    socket.on('hitPlayer', (targetId) => {
         const roomId = socket.roomId;
-        if (roomId && rooms[roomId]) {
-            const room = rooms[roomId];
-            const correctAns = room.puzzle.answer;
-            const isCorrect = userAnswer.length === correctAns.length && userAnswer.every((val, idx) => val === correctAns[idx]);
-
-            if (isCorrect) {
-                room.stage++;
-                room.switchActivated = false; // 다음 스테이지를 위해 스위치 초기화
-
-                if (room.stage > room.maxStages) {
-                    room.isGameCleared = true;
-                    io.to(roomId).emit('gameCleared');
-                } else {
-                    room.puzzle = generatePuzzle();
-                    io.to(roomId).emit('nextStage', {
-                        stage: room.stage,
-                        puzzleType: room.puzzle.type,
-                        numbers: room.puzzle.numbers
-                    });
+        if (roomId && rooms[roomId] && rooms[roomId].players[targetId]) {
+            const target = rooms[roomId].players[targetId];
+            target.hp -= 25; // 총알 데미지
+            
+            if (target.hp <= 0) {
+                target.hp = 100;
+                target.x = (Math.random() - 0.5) * 12;
+                target.z = (Math.random() - 0.5) * 12;
+                if (rooms[roomId].players[socket.id]) {
+                    rooms[roomId].players[socket.id].score += 1;
                 }
-            } else {
-                socket.emit('puzzleFailed');
             }
+            io.to(roomId).emit('updateStats', rooms[roomId].players);
         }
     });
 
@@ -130,5 +101,5 @@ io.on('connection', (socket) => {
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
-    console.log(`서버 실행 중... 포트: ${PORT}`);
+    console.log(`TPS 게임 서버 실행 중... 포트: ${PORT}`);
 });
