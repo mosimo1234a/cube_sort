@@ -11,10 +11,11 @@
             background-color: #111;
             font-family: 'Arial', sans-serif;
             user-select: none;
+            cursor: pointer;
         }
         #crosshair {
             position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            color: rgba(255, 255, 255, 0.8); font-size: 24px; pointer-events: none; display: none; z-index: 5;
+            color: rgba(255, 255, 255, 0.9); font-size: 24px; pointer-events: none; display: none; z-index: 5;
         }
         #hud {
             position: absolute; top: 20px; left: 20px; color: white; background: rgba(0, 0, 0, 0.7);
@@ -30,7 +31,7 @@
         #start-screen {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(0, 0, 0, 0.9); display: flex; justify-content: center;
-            align-items: center; z-index: 10;
+            align-items: center; z-index: 10; cursor: default;
         }
         .modal-box {
             background: #fff; padding: 30px 40px; border-radius: 20px; text-align: center;
@@ -77,7 +78,7 @@
     <div id="crosshair">+</div>
     <div id="hud">내 체력: <span id="my-hp" style="color:#2ecc71; font-weight:bold;">100</span> | 점수: <span id="my-score" style="color:#f1c40f; font-weight:bold;">0</span></div>
     <div id="instructions">
-        <strong>우클릭 드래그</strong>: 시점 회전 | <strong>WASD</strong>: 이동 | <strong>SPACE</strong>: 점프 | <strong>좌클릭</strong>: 총알 발사!
+        <strong>화면 클릭</strong>: 마우스 시점 고정 | <strong>WASD</strong>: 이동 | <strong>SPACE</strong>: 점프 | <strong>좌클릭</strong>: 총알 발사!
     </div>
     <div id="my-name-tag" class="name-tag my-tag"></div>
 
@@ -167,7 +168,6 @@
             body.castShadow = true;
             group.add(body);
 
-            // 눈 2개
             const leftEye = new THREE.Mesh(eyeGeo, eyeMat);
             leftEye.position.set(-0.35, 0.9, 0.77);
             group.add(leftEye);
@@ -176,7 +176,6 @@
             rightEye.position.set(0.35, 0.9, 0.77);
             group.add(rightEye);
 
-            // 총 모델 추가 (오른쪽 전방에 배치)
             const gun = new THREE.Mesh(gunGeo, gunMat);
             gun.position.set(0.65, 0.6, 0.6);
             group.add(gun);
@@ -194,34 +193,30 @@
 
         let cameraAngleX = 0;
         let cameraAngleY = 0.5;
-        let isDragging = false;
-        let prevMousePos = { x: 0, y: 0 };
 
-        // 마우스 입력 처리 (좌클릭: 슈팅 / 우클릭 드래그: 시점 회전)
-        window.addEventListener('mousedown', (e) => {
-            if (!gameStarted) return;
-            if (e.button === 0) {
-                shootBullet(); // 좌클릭 시 총알 발사
-            } else if (e.button === 2) {
-                isDragging = true;
-                prevMousePos = { x: e.clientX, y: e.clientY };
+        // 화면 클릭 시 포인터 락 활성화 (마우스로 시점 자유 회전)
+        renderer.domElement.addEventListener('click', () => {
+            if (gameStarted && document.pointerLockElement !== renderer.domElement) {
+                renderer.domElement.requestPointerLock();
             }
         });
 
-        window.addEventListener('mousemove', (e) => {
-            if (!gameStarted || !isDragging) return;
-            const deltaX = e.clientX - prevMousePos.x;
-            const deltaY = e.clientY - prevMousePos.y;
-
-            cameraAngleX -= deltaX * 0.004;
-            cameraAngleY = Math.max(0.1, Math.min(1.4, cameraAngleY + deltaY * 0.004));
-            prevMousePos = { x: e.clientX, y: e.clientY };
+        // 마우스 움직임으로 카메라 회전
+        document.addEventListener('mousemove', (e) => {
+            if (!gameStarted) return;
+            if (document.pointerLockElement === renderer.domElement) {
+                cameraAngleX -= e.movementX * 0.003;
+                cameraAngleY = Math.max(0.1, Math.min(1.4, cameraAngleY + e.movementY * 0.003));
+            }
         });
 
-        window.addEventListener('mouseup', (e) => {
-            if (e.button === 2) isDragging = false;
+        // 좌클릭 시 총알 발사
+        window.addEventListener('mousedown', (e) => {
+            if (!gameStarted) return;
+            if (e.button === 0) {
+                shootBullet();
+            }
         });
-        window.addEventListener('contextmenu', e => e.preventDefault()); // 우클릭 메뉴 방지
 
         startBtn.addEventListener('click', () => {
             const roomId = roomInput.value.trim() || '아레나1';
@@ -282,6 +277,9 @@
             crosshair.style.display = 'block';
             myNameTag.style.display = 'block';
             gameStarted = true;
+
+            // 게임 시작 직후 포인터 락 요청
+            renderer.domElement.requestPointerLock();
         });
 
         function addOtherPlayer(data) {
@@ -305,7 +303,6 @@
             const dir = new THREE.Vector3();
             camera.getWorldDirection(dir);
 
-            // 캐릭터 위치에서 총구 방향으로 약간 앞쪽에서 발사
             const startPos = myPlayer.group.position.clone().add(new THREE.Vector3(0, 1.2, 0));
             startPos.addScaledVector(dir, 0.8);
 
