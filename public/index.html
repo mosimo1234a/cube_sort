@@ -163,18 +163,18 @@
         scene.add(platform);
         obstacleBounds.push({ minX: -5, maxX: 5, minZ: -5, maxZ: 5, maxY: 2.5 });
 
-        // 경사로(램프)
+        // 완벽하게 일치하는 경사로(램프) 디자인 및 배치
         const rampMat = new THREE.MeshStandardMaterial({ color: 0xb5651d, roughness: 0.5 });
-        const rampGeo = new THREE.BoxGeometry(4, 2.5, 6);
+        const rampGeo = new THREE.BoxGeometry(4, 0.4, 5.59);
         
         const ramp1 = new THREE.Mesh(rampGeo, rampMat);
-        ramp1.position.set(0, 0.6, -7);
-        ramp1.rotation.x = -Math.PI / 8;
+        ramp1.position.set(0, 1.25, -7.5);
+        ramp1.rotation.x = -Math.atan(0.5);
         scene.add(ramp1);
 
         const ramp2 = new THREE.Mesh(rampGeo, rampMat);
-        ramp2.position.set(0, 0.6, 7);
-        ramp2.rotation.x = Math.PI / 8;
+        ramp2.position.set(0, 1.25, 7.5);
+        ramp2.rotation.x = Math.atan(0.5);
         scene.add(ramp2);
 
         // 주변 초코 상자 엄폐물
@@ -237,20 +237,20 @@
         let cameraAngleX = 0;
         let cameraAngleY = 0.2;
 
-        // 🔥 경사로 및 플랫폼 높이 계산 로직 수정
+        // 🔥 플랫폼 및 경사로 높이 계산 공식 (완벽한 단차 연결)
         function getFloorHeight(x, z) {
             // 중앙 플랫폼 위 (Y = 2.5)
             if (x >= -5 && x <= 5 && z >= -5 && z <= 5) {
                 return 2.5;
             }
-            // 앞쪽 램프 (Z: -10 ~ -4, X: -2 ~ 2) -> 0에서 2.5로 상승
-            if (x >= -2 && x <= 2 && z >= -10 && z <= -4) {
-                const t = (z - (-10)) / 6; 
+            // 앞쪽 램프 (Z: -10 ~ -5, X: -2 ~ 2) -> 0에서 2.5로 완벽하게 선형 상승
+            if (x >= -2 && x <= 2 && z >= -10 && z <= -5) {
+                const t = (z - (-10)) / 5; 
                 return t * 2.5;
             }
-            // 뒤쪽 램프 (Z: 4 ~ 10, X: -2 ~ 2) -> 2.5에서 0으로 하강
-            if (x >= -2 && x <= 2 && z >= 4 && z <= 10) {
-                const t = (10 - z) / 6; 
+            // 뒤쪽 램프 (Z: 5 ~ 10, X: -2 ~ 2) -> 2.5에서 0으로 완벽하게 선형 하강
+            if (x >= -2 && x <= 2 && z >= 5 && z <= 10) {
+                const t = (10 - z) / 5; 
                 return t * 2.5;
             }
             return 0; // 일반 바닥
@@ -481,13 +481,19 @@
 
                 currentFloorY = getFloorHeight(myPlayer.group.position.x, myPlayer.group.position.z);
 
-                playerVelocity.y -= gravity;
-                myPlayer.group.position.y += playerVelocity.y;
-
-                if (myPlayer.group.position.y <= currentFloorY) {
+                // 🔥 경사로와 바닥에서 파묻히지 않도록 즉시 밀착 처리
+                if (isGrounded) {
                     myPlayer.group.position.y = currentFloorY;
                     playerVelocity.y = 0;
-                    isGrounded = true;
+                } else {
+                    playerVelocity.y -= gravity;
+                    myPlayer.group.position.y += playerVelocity.y;
+
+                    if (myPlayer.group.position.y <= currentFloorY) {
+                        myPlayer.group.position.y = currentFloorY;
+                        playerVelocity.y = 0;
+                        isGrounded = true;
+                    }
                 }
 
                 socket.emit('playerUpdate', {
