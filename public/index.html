@@ -17,6 +17,11 @@
             position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
             color: rgba(255, 243, 230, 0.9); font-size: 24px; pointer-events: none; display: none; z-index: 5;
         }
+        #hit-overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(231, 76, 60, 0.4); opacity: 0; pointer-events: none; z-index: 4;
+            transition: opacity 0.1s ease-in-out;
+        }
         #hud {
             position: absolute; top: 20px; left: 20px; color: #fff3e6; background: rgba(56, 31, 18, 0.85);
             padding: 12px 18px; border-radius: 12px; font-size: 14px; display: none; z-index: 5;
@@ -76,6 +81,7 @@
         </div>
     </div>
 
+    <div id="hit-overlay"></div>
     <div id="crosshair">+</div>
     <div id="hud">내 체력: <span id="my-hp" style="color:#ffe600; font-weight:bold;">100</span> | 점수: <span id="my-score" style="color:#ffa500; font-weight:bold;">0</span></div>
     <div id="instructions">
@@ -102,11 +108,11 @@
         const instructions = document.getElementById('instructions');
         const hud = document.getElementById('hud');
         const crosshair = document.getElementById('crosshair');
+        const hitOverlay = document.getElementById('hit-overlay');
         const myNameTag = document.getElementById('my-name-tag');
         const myHpSpan = document.getElementById('my-hp');
         const myScoreSpan = document.getElementById('my-score');
 
-        // 3D 씬 구성 (밀크초코 테마 톤)
         const scene = new THREE.Scene();
         scene.background = new THREE.Color(0x2d1b12);
         scene.fog = new THREE.Fog(0x2d1b12, 25, 60);
@@ -123,7 +129,6 @@
         dirLight.castShadow = true;
         scene.add(dirLight);
 
-        // 밀크초코 바닥
         const floor = new THREE.Mesh(
             new THREE.PlaneGeometry(50, 50),
             new THREE.MeshStandardMaterial({ color: 0x734a2e, roughness: 0.7 })
@@ -132,7 +137,6 @@
         floor.receiveShadow = true;
         scene.add(floor);
 
-        // 다크초코 외곽 벽
         const wallMat = new THREE.MeshStandardMaterial({ color: 0x482d1c, roughness: 0.6 });
         [-25, 25].forEach(x => {
             const w = new THREE.Mesh(new THREE.BoxGeometry(1, 10, 50), wallMat);
@@ -143,7 +147,6 @@
             w.position.set(0, 5, z); scene.add(w);
         });
 
-        // 카라멜/화이트초코풍 엄폐용 장애물 생성
         const obstacleMat = new THREE.MeshStandardMaterial({ color: 0xd4a373, roughness: 0.4 });
         const obstacleGeo = new THREE.BoxGeometry(4, 3, 4);
         [[ -10, -10 ], [ 10, 10 ], [ -10, 10 ], [ 10, -10 ], [ 0, -15 ]].forEach(pos => {
@@ -154,7 +157,6 @@
             scene.add(obs);
         });
 
-        // 네모 캐릭터 및 총 메쉬 생성 함수
         const bodyGeo = new THREE.BoxGeometry(1.5, 1.5, 1.5);
         const eyeGeo = new THREE.BoxGeometry(0.18, 0.18, 0.05);
         const eyeMat = new THREE.MeshBasicMaterial({ color: 0x1f1008 });
@@ -181,7 +183,7 @@
             gun.position.set(0.65, 0.6, 0.6);
             group.add(gun);
 
-            return { group, body };
+            return { group, body, gun };
         }
 
         let myPlayer;
@@ -262,6 +264,13 @@
                 }
             });
 
+            socket.on('damaged', () => {
+                hitOverlay.style.opacity = '1';
+                setTimeout(() => {
+                    hitOverlay.style.opacity = '0';
+                }, 150);
+            });
+
             socket.on('playerDisconnected', (id) => {
                 if (otherPlayers[id]) {
                     scene.remove(otherPlayers[id].group);
@@ -304,14 +313,16 @@
             const sinX = Math.sin(cameraAngleX);
             const camDir = new THREE.Vector3(sinX * cosY, sinY, cosX * cosY).normalize();
 
-            const startPos = myPlayer.group.position.clone().add(new THREE.Vector3(0, 1.2, 0));
+            // 핵심: 총 메쉬의 월드 좌표(총구 끝)에서 총알이 발사되도록 설정
+            const gunTipPos = new THREE.Vector3();
+            myPlayer.gun.getWorldPosition(gunTipPos);
 
             socket.emit('shoot', {
-                x: startPos.x, y: startPos.y, z: startPos.z,
+                x: gunTipPos.x, y: gunTipPos.y, z: gunTipPos.z,
                 dirX: camDir.x, dirY: camDir.y, dirZ: camDir.z
             });
 
-            createVisualBullet(startPos.x, startPos.y, startPos.z, camDir.x, camDir.y, camDir.z, 0xffd166, true);
+            createVisualBullet(gunTipPos.x, gunTipPos.y, gunTipPos.z, camDir.x, camDir.y, camDir.z, 0xffd166, true);
         }
 
         function createVisualBullet(x, y, z, dx, dy, dz, colorHex, isMine = false) {
@@ -379,7 +390,6 @@
                     myPlayer.body.position.y = 0.75;
                 }
 
-                // 캐릭터가 카메라 방향(시점)을 바라보도록 회전
                 myPlayer.group.rotation.y = cameraAngleX;
 
                 socket.emit('playerUpdate', {
@@ -397,7 +407,6 @@
                     isGrounded = true;
                 }
 
-                // 총알 이동 및 충돌 체크
                 for (let i = activeBullets.length - 1; i >= 0; i--) {
                     const b = activeBullets[i];
                     b.mesh.position.addScaledVector(b.dir, 0.8);
@@ -419,7 +428,6 @@
                     }
                 }
 
-                // 좌측 어깨너머(Left-Shoulder View) 카메라 공식 적용 (플레이어가 우측에 위치)
                 const cosY = Math.cos(cameraAngleY);
                 const sinY = Math.sin(cameraAngleY);
                 const cosX = Math.cos(cameraAngleX);
