@@ -615,8 +615,8 @@
             if (!gameStarted || isDead) return;
             if (e.code === 'KeyW' || e.code === 'ArrowUp') keys.forward = true;
             if (e.code === 'KeyS' || e.code === 'ArrowDown') keys.backward = true;
-            if (e.code === 'KeyA' || e.code === 'ArrowLeft') keys.left = true;
-            if (e.code === 'KeyD' || e.code === 'ArrowRight') keys.right = true;
+            if (e.code === 'KeyA' || e.code === 'ArrowLeft') keys.right = true;
+            if (e.code === 'KeyD' || e.code === 'ArrowRight') keys.left = true;
             if (e.code === 'Space' && isGrounded) {
                 playerVelocity.y = jumpForce;
                 isGrounded = false;
@@ -636,8 +636,8 @@
             if (!gameStarted) return;
             if (e.code === 'KeyW' || e.code === 'ArrowUp') keys.forward = false;
             if (e.code === 'KeyS' || e.code === 'ArrowDown') keys.backward = false;
-            if (e.code === 'KeyA' || e.code === 'ArrowLeft') keys.left = false;
-            if (e.code === 'KeyD' || e.code === 'ArrowRight') keys.right = false;
+            if (e.code === 'KeyA' || e.code === 'ArrowLeft') keys.right = false;
+            if (e.code === 'KeyD' || e.code === 'ArrowRight') keys.left = false;
             if (e.code === 'Tab') {
                 scoreboard.style.display = 'none';
             }
