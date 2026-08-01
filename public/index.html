@@ -102,7 +102,6 @@
         const activeBullets = [];
         const obstacleBounds = [];
 
-        // 🔫 무기 데이터 정의
         const weapons = [
             { id: 0, name: '돌격소총', cooldown: 160, pellets: 1, spread: 0.015, color: 0x3d2314 },
             { id: 1, name: '샷건', cooldown: 550, pellets: 5, spread: 0.08, color: 0x8b0000 },
@@ -141,7 +140,6 @@
         dirLight.castShadow = true;
         scene.add(dirLight);
 
-        // 초코 바닥
         const floor = new THREE.Mesh(
             new THREE.PlaneGeometry(60, 60),
             new THREE.MeshStandardMaterial({ color: 0x734a2e, roughness: 0.7 })
@@ -150,7 +148,6 @@
         floor.receiveShadow = true;
         scene.add(floor);
 
-        // 외곽 초코 벽
         const wallMat = new THREE.MeshStandardMaterial({ color: 0x482d1c, roughness: 0.6 });
         [-30, 30].forEach(x => {
             const w = new THREE.Mesh(new THREE.BoxGeometry(1, 12, 60), wallMat);
@@ -161,10 +158,8 @@
             w.position.set(0, 6, z); scene.add(w);
         });
 
-        // 구조물
         const obstacleMat = new THREE.MeshStandardMaterial({ color: 0xd4a373, roughness: 0.4 });
         
-        // 중앙 고가 플랫폼
         const platformGeo = new THREE.BoxGeometry(10, 2.5, 10);
         const platform = new THREE.Mesh(platformGeo, obstacleMat);
         platform.position.set(0, 1.25, 0);
@@ -173,7 +168,6 @@
         scene.add(platform);
         obstacleBounds.push({ minX: -5, maxX: 5, minZ: -5, maxZ: 5, maxY: 2.5 });
 
-        // 경사로(램프)
         const rampMat = new THREE.MeshStandardMaterial({ color: 0xb5651d, roughness: 0.5 });
         const rampGeo = new THREE.BoxGeometry(4, 0.4, 5.59);
         
@@ -187,7 +181,6 @@
         ramp2.rotation.x = Math.atan(0.5);
         scene.add(ramp2);
 
-        // 주변 초코 상자 엄폐물
         const boxGeo = new THREE.BoxGeometry(4, 4, 4);
         [[ -15, -15 ], [ 15, 15 ], [ -15, 15 ], [ 15, -15 ], [ 0, -20 ], [ 0, 20 ]].forEach(pos => {
             const obs = new THREE.Mesh(boxGeo, obstacleMat);
@@ -286,10 +279,11 @@
             }
         });
 
+        // 🔥 마우스 시점 반전 수정 (+로 변경)
         document.addEventListener('mousemove', (e) => {
             if (!gameStarted) return;
             if (document.pointerLockElement === renderer.domElement) {
-                cameraAngleX -= e.movementX * 0.003;
+                cameraAngleX += e.movementX * 0.003;
                 cameraAngleY -= e.movementY * 0.003;
                 cameraAngleY = Math.max(-1.2, Math.min(1.4, cameraAngleY));
             }
@@ -399,7 +393,6 @@
             const gunTipPos = new THREE.Vector3();
             myPlayer.gun.getWorldPosition(gunTipPos);
 
-            // 샷건 등 다중 발사 처리
             for (let i = 0; i < wp.pellets; i++) {
                 const spreadX = (Math.random() - 0.5) * wp.spread;
                 const spreadY = (Math.random() - 0.5) * wp.spread;
@@ -439,7 +432,6 @@
                 playerVelocity.y = jumpForce;
                 isGrounded = false;
             }
-            // 🔢 무기 단축키 변환
             if (e.code === 'Digit1') { currentWeaponIdx = 0; updateWeaponMesh(); }
             if (e.code === 'Digit2') { currentWeaponIdx = 1; updateWeaponMesh(); }
             if (e.code === 'Digit3') { currentWeaponIdx = 2; updateWeaponMesh(); }
