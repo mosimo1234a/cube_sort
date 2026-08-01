@@ -8,105 +8,106 @@ const io = new Server(server);
 
 app.use(express.static('public'));
 
-const players = {};
+const rooms = {};
 
 io.on('connection', (socket) => {
-    console.log(`플레이어 접속: ${socket.id}`);
+    console.log('유저 접속:', socket.id);
+    let currentRoom = null;
 
     socket.on('joinRoom', (data) => {
-        const { roomId, nickname, color } = data;
-        socket.join(roomId);
-        socket.roomId = roomId;
+        currentRoom = data.roomId;
+        socket.join(currentRoom);
 
-        players[socket.id] = {
+        if (!rooms[currentRoom]) {
+            rooms[currentRoom] = { players: {} };
+        }
+
+        rooms[currentRoom].players[socket.id] = {
             id: socket.id,
-            roomId: roomId,
-            nickname: nickname || '초코총잡이',
-            color: color || '#d4a373',
-            x: (Math.random() - 0.5) * 20,
+            nickname: data.nickname || '초코총잡이',
+            color: data.color || '#d4a373',
+            x: 0,
             y: 0,
-            z: (Math.random() - 0.5) * 20,
+            z: 0,
             rotationY: 0,
             hp: 100,
             score: 0
         };
 
-        const roomPlayers = {};
-        Object.keys(players).forEach(id => {
-            if (players[id].roomId === roomId) {
-                roomPlayers[id] = players[id];
-            }
-        });
-        socket.emit('currentPlayers', roomPlayers);
-        socket.to(roomId).emit('newPlayer', players[socket.id]);
+        socket.emit('currentPlayers', rooms[currentRoom].players);
+        socket.to(currentRoom).emit('newPlayer', rooms[currentRoom].players[socket.id]);
     });
 
     socket.on('playerUpdate', (data) => {
-        if (players[socket.id]) {
-            players[socket.id].x = data.x;
-            players[socket.id].y = data.y;
-            players[socket.id].z = data.z;
-            players[socket.id].rotationY = data.rotationY;
+        if (!currentRoom || !rooms[currentRoom] || !rooms[currentRoom].players[socket.id]) return;
+        const p = rooms[currentRoom].players[socket.id];
+        p.x = data.x;
+        p.y = data.y;
+        p.z = data.z;
+        p.rotationY = data.rotationY;
 
-            socket.to(socket.roomId).emit('playerMoved', {
-                id: socket.id,
-                x: data.x,
-                y: data.y,
-                z: data.z,
-                rotationY: data.rotationY
-            });
-        }
+        socket.to(currentRoom).emit('playerMoved', {
+            id: socket.id,
+            x: p.x,
+            y: p.y,
+            z: p.z,
+            rotationY: p.rotationY
+        });
     });
 
     socket.on('shoot', (data) => {
-        if (players[socket.id]) {
-            socket.to(socket.roomId).emit('playerShooting', {
-                id: socket.id,
-                x: data.x,
-                y: data.y,
-                z: data.z,
-                dirX: data.dirX,
-                dirY: data.dirY,
-                dirZ: data.dirZ
-            });
-        }
+        if (!currentRoom) return;
+        socket.to(currentRoom).emit('playerShooting', {
+            id: socket.id,
+            x: data.x,
+            y: data.y,
+            z: data.z,
+            dirX: data.dirX,
+            dirY: data.dirY,
+            dirZ: data.dirZ
+        });
     });
 
+    // 🔥 총에 맞았을 때 체력 감소 및 사망/리스폰 처리
     socket.on('hitPlayer', (targetId) => {
-        if (players[targetId] && players[socket.id]) {
-            players[targetId].hp -= 25; // 4발 맞으면 사망
+        if (!currentRoom || !rooms[currentRoom]) return;
+        const roomPlayers = rooms[currentRoom].players;
+        const target = roomPlayers[targetId];
+        const shooter = roomPlayers[socket.id];
 
-            if (players[targetId].hp <= 0) {
-                players[targetId].hp = 100; // 부활
-                players[targetId].x = (Math.random() - 0.5) * 20;
-                players[targetId].z = (Math.random() - 0.5) * 20;
-                players[socket.id].score += 1; // 맞춘 사람 점수 획득
+        if (target) {
+            target.hp -= 25; // 4발 맞으면 사망
+            io.to(targetId).emit('damaged');
+
+            if (target.hp <= 0) {
+                target.hp = 100;
+                target.x = (Math.random() - 0.5) * 16;
+                target.z = (Math.random() - 0.5) * 16;
+                target.y = 0;
+
+                if (shooter && socket.id !== targetId) {
+                    shooter.score += 1; // 킬 점수 획득
+                }
             }
 
-            const roomPlayers = {};
-            Object.keys(players).forEach(id => {
-                if (players[id].roomId === socket.roomId) {
-                    roomPlayers[id] = players[id];
-                }
-            });
-            io.to(socket.roomId).emit('updateStats', roomPlayers);
-            
-            // 맞은 플레이어에게 피격 신호 전송
-            io.to(targetId).emit('damaged');
+            io.to(currentRoom).emit('updateStats', roomPlayers);
         }
     });
 
     socket.on('disconnect', () => {
-        console.log(`플레이어 퇴장: ${socket.id}`);
-        if (players[socket.id]) {
-            const roomId = players[socket.id].roomId;
-            delete players[socket.id];
-            io.to(roomId).emit('playerDisconnected', socket.id);
+        console.log('유저 퇴장:', socket.id);
+        if (currentRoom && rooms[currentRoom] && rooms[currentRoom].players[socket.id]) {
+            delete rooms[currentRoom].players[socket.id];
+            io.to(currentRoom).emit('playerDisconnected', socket.id);
+            
+            if (Object.keys(rooms[currentRoom].players).length === 0) {
+                delete rooms[currentRoom];
+            }
         }
     });
 });
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
-    console.log(`🍫 밀크초코 아레나 서버 실행 중: http://localhost:${PORT}`);
+    console.log(`서버 실행 중: 포트 ${PORT}`);
 });
