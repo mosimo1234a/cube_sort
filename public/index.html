@@ -115,7 +115,6 @@
         const myHpSpan = document.getElementById('my-hp');
         const myScoreSpan = document.getElementById('my-score');
 
-        // 밀크초코 테마 배경 및 안개
         const scene = new THREE.Scene();
         scene.background = new THREE.Color(0x2d1b12);
         scene.fog = new THREE.Fog(0x2d1b12, 25, 60);
@@ -152,7 +151,7 @@
             w.position.set(0, 6, z); scene.add(w);
         });
 
-        // 구조물 (중앙 플랫폼, 램프, 박스) - 밀크초코 재질
+        // 구조물
         const obstacleMat = new THREE.MeshStandardMaterial({ color: 0xd4a373, roughness: 0.4 });
         
         // 중앙 고가 플랫폼
@@ -196,7 +195,6 @@
             });
         });
 
-        // 밀크초코 캐릭터 디자인
         const bodyGeo = new THREE.BoxGeometry(1.5, 1.5, 1.5);
         const eyeGeo = new THREE.BoxGeometry(0.18, 0.18, 0.05);
         const eyeMat = new THREE.MeshBasicMaterial({ color: 0x1f1008 });
@@ -239,11 +237,23 @@
         let cameraAngleX = 0;
         let cameraAngleY = 0.2;
 
+        // 🔥 경사로 및 플랫폼 높이 계산 로직 수정
         function getFloorHeight(x, z) {
+            // 중앙 플랫폼 위 (Y = 2.5)
             if (x >= -5 && x <= 5 && z >= -5 && z <= 5) {
                 return 2.5;
             }
-            return 0;
+            // 앞쪽 램프 (Z: -10 ~ -4, X: -2 ~ 2) -> 0에서 2.5로 상승
+            if (x >= -2 && x <= 2 && z >= -10 && z <= -4) {
+                const t = (z - (-10)) / 6; 
+                return t * 2.5;
+            }
+            // 뒤쪽 램프 (Z: 4 ~ 10, X: -2 ~ 2) -> 2.5에서 0으로 하강
+            if (x >= -2 && x <= 2 && z >= 4 && z <= 10) {
+                const t = (10 - z) / 6; 
+                return t * 2.5;
+            }
+            return 0; // 일반 바닥
         }
 
         function checkCollision(x, z) {
