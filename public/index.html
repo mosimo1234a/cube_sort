@@ -3,80 +3,81 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>귀여운 네모 아레나 TPS</title>
+    <title>밀크초코 네모 아레나 TPS</title>
     <style>
         body {
             margin: 0;
             overflow: hidden;
-            background-color: #111;
+            background-color: #2d1b12;
             font-family: 'Arial', sans-serif;
             user-select: none;
             cursor: pointer;
         }
         #crosshair {
             position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            color: rgba(255, 255, 255, 0.9); font-size: 24px; pointer-events: none; display: none; z-index: 5;
+            color: rgba(255, 243, 230, 0.9); font-size: 24px; pointer-events: none; display: none; z-index: 5;
         }
         #hud {
-            position: absolute; top: 20px; left: 20px; color: white; background: rgba(0, 0, 0, 0.7);
+            position: absolute; top: 20px; left: 20px; color: #fff3e6; background: rgba(56, 31, 18, 0.85);
             padding: 12px 18px; border-radius: 12px; font-size: 14px; display: none; z-index: 5;
-            border: 2px solid #e67e22; box-shadow: 0 4px 6px rgba(0,0,0,0.3); pointer-events: none;
+            border: 2px solid #d4a373; box-shadow: 0 4px 6px rgba(0,0,0,0.4); pointer-events: none;
         }
         #instructions {
             position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
-            color: white; background: rgba(0, 0, 0, 0.8); padding: 10px 20px;
+            color: #fff3e6; background: rgba(56, 31, 18, 0.85); padding: 10px 20px;
             border-radius: 20px; font-size: 13px; pointer-events: none; text-align: center;
-            display: none; z-index: 5; box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            display: none; z-index: 5; box-shadow: 0 4px 6px rgba(0,0,0,0.4); border: 1px solid #d4a373;
         }
         #start-screen {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0, 0, 0, 0.9); display: flex; justify-content: center;
+            background: linear-gradient(135deg, #2d1b12 0%, #1a0f0a 100%); display: flex; justify-content: center;
             align-items: center; z-index: 10; cursor: default;
         }
         .modal-box {
-            background: #fff; padding: 30px 40px; border-radius: 20px; text-align: center;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.5); width: 340px;
+            background: #fdfbf7; padding: 30px 40px; border-radius: 20px; text-align: center;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.6); width: 340px; border: 4px solid #d4a373;
         }
-        .modal-box h2 { margin-top: 0; color: #222; }
+        .modal-box h2 { margin-top: 0; color: #4a2e18; }
         .modal-box input {
-            width: 85%; padding: 10px; font-size: 15px; border: 2px solid #ddd;
-            border-radius: 8px; margin-bottom: 12px; text-align: center; outline: none;
+            width: 85%; padding: 10px; font-size: 15px; border: 2px solid #d4a373;
+            border-radius: 8px; margin-bottom: 12px; text-align: center; outline: none; background: #fff; color: #333;
         }
         .color-picker-wrapper {
-            margin-bottom: 15px; display: flex; align-items: center; justify-content: center; gap: 10px; font-size: 14px; color: #555;
+            margin-bottom: 15px; display: flex; align-items: center; justify-content: center; gap: 10px; font-size: 14px; color: #5a3e2b; font-weight: bold;
         }
         .modal-box input[type="color"] { width: 40px; height: 35px; border: none; border-radius: 6px; cursor: pointer; background: none; }
         .modal-box button {
-            width: 100%; padding: 12px; font-size: 16px; background: #e67e22;
+            width: 100%; padding: 12px; font-size: 16px; background: #b5651d;
             border: none; border-radius: 8px; cursor: pointer; font-weight: bold; color: white;
+            transition: background 0.2s;
         }
-        .modal-box button:hover { background: #d35400; }
+        .modal-box button:hover { background: #8c4d16; }
         .name-tag {
-            position: absolute; color: white; background: rgba(0, 0, 0, 0.6);
+            position: absolute; color: #fff; background: rgba(74, 46, 24, 0.8);
             padding: 4px 10px; border-radius: 12px; font-size: 12px; font-weight: bold;
             pointer-events: none; transform: translate(-50%, -100%); white-space: nowrap;
-            display: none; box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+            display: none; box-shadow: 0 2px 4px rgba(0,0,0,0.3); border: 1px solid #d4a373;
         }
-        .my-tag { background: rgba(230, 126, 34, 0.9); }
+        .my-tag { background: rgba(181, 101, 29, 0.9); }
     </style>
 </head>
 <body>
     <div id="start-screen">
         <div class="modal-box">
-            <h2>🎯 네모 아레나 TPS</h2>
-            <p style="color: #666; font-size: 13px; margin-bottom: 15px;">귀여운 네모 캐릭터들의 난투전!</p>
-            <input type="text" id="room-input" value="아레나1" placeholder="방 이름">
-            <input type="text" id="nickname-input" value="총잡이네모" maxlength="10" placeholder="닉네임">
+            <h2>🍫 밀크초코 아레나</h2>
+            <p style="color: #7b5b42; font-size: 13px; margin-bottom: 15px;">달콤한 초코 전장의 난투전!</p>
+            <input type="text" id="room-input" value="초코방1" placeholder="방 이름">
+            <input type="text" id="nickname-input" value="초코총잡이" maxlength="10" placeholder="닉네임">
             <div class="color-picker-wrapper">
                 <label for="color-input">내 캐릭터 색상:</label>
-                <input type="color" id="color-input" value="#e67e22">
+                <input type="color" id="color-input" value="#d4a373">
             </div>
-            <button id="start-btn">전장 입장</button>
+            <button id="start-btn">초코 전장 입장</button>
         </div>
     </div>
 
     <div id="crosshair">+</div>
-    <div id="hud">내 체력: <span id="my-hp" style="color:#2ecc71; font-weight:bold;">100</span> | 점수: <span id="my-score" style="color:#f1c40f; font-weight:bold;">0</span></div>
+    <div id="hud">내 체력: <span id="my-hp" style="color:#ffe600; font-weight:bold;">100</span> | 점수: <span id="my-score" style="color:#ffa500; font-weight:bold;">0</span></div>
     <div id="instructions">
         <strong>화면 클릭</strong>: 마우스 시점 고정 | <strong>WASD</strong>: 이동 | <strong>SPACE</strong>: 점프 | <strong>좌클릭</strong>: 총알 발사!
     </div>
@@ -105,10 +106,10 @@
         const myHpSpan = document.getElementById('my-hp');
         const myScoreSpan = document.getElementById('my-score');
 
-        // 3D 씬 구성
+        // 3D 씬 구성 (밀크초코 테마 톤)
         const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x1a1a1a);
-        scene.fog = new THREE.Fog(0x1a1a1a, 25, 60);
+        scene.background = new THREE.Color(0x2d1b12);
+        scene.fog = new THREE.Fog(0x2d1b12, 25, 60);
 
         const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
         const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -116,23 +117,23 @@
         renderer.shadowMap.enabled = true;
         document.body.appendChild(renderer.domElement);
 
-        scene.add(new THREE.AmbientLight(0xffffff, 0.6));
-        const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        scene.add(new THREE.AmbientLight(0xfff3e6, 0.7));
+        const dirLight = new THREE.DirectionalLight(0xffedd8, 0.9);
         dirLight.position.set(15, 30, 15);
         dirLight.castShadow = true;
         scene.add(dirLight);
 
-        // 아레나 바닥
+        // 밀크초코 바닥
         const floor = new THREE.Mesh(
             new THREE.PlaneGeometry(50, 50),
-            new THREE.MeshStandardMaterial({ color: 0x2c3e50, roughness: 0.8 })
+            new THREE.MeshStandardMaterial({ color: 0x734a2e, roughness: 0.7 })
         );
         floor.rotation.x = -Math.PI / 2;
         floor.receiveShadow = true;
         scene.add(floor);
 
-        // 아레나 외곽 벽
-        const wallMat = new THREE.MeshStandardMaterial({ color: 0x34495e, roughness: 0.7 });
+        // 다크초코 외곽 벽
+        const wallMat = new THREE.MeshStandardMaterial({ color: 0x482d1c, roughness: 0.6 });
         [-25, 25].forEach(x => {
             const w = new THREE.Mesh(new THREE.BoxGeometry(1, 10, 50), wallMat);
             w.position.set(x, 5, 0); scene.add(w);
@@ -142,9 +143,9 @@
             w.position.set(0, 5, z); scene.add(w);
         });
 
-        // 엄폐용 장애물 생성
+        // 카라멜/화이트초코풍 엄폐용 장애물 생성
+        const obstacleMat = new THREE.MeshStandardMaterial({ color: 0xd4a373, roughness: 0.4 });
         const obstacleGeo = new THREE.BoxGeometry(4, 3, 4);
-        const obstacleMat = new THREE.MeshStandardMaterial({ color: 0x7f8c8d, roughness: 0.5 });
         [[ -10, -10 ], [ 10, 10 ], [ -10, 10 ], [ 10, -10 ], [ 0, -15 ]].forEach(pos => {
             const obs = new THREE.Mesh(obstacleGeo, obstacleMat);
             obs.position.set(pos[0], 1.5, pos[1]);
@@ -156,11 +157,11 @@
         // 네모 캐릭터 및 총 메쉬 생성 함수
         const bodyGeo = new THREE.BoxGeometry(1.5, 1.5, 1.5);
         const eyeGeo = new THREE.BoxGeometry(0.18, 0.18, 0.05);
-        const eyeMat = new THREE.MeshBasicMaterial({ color: 0x222222 });
+        const eyeMat = new THREE.MeshBasicMaterial({ color: 0x1f1008 });
         const gunGeo = new THREE.BoxGeometry(0.25, 0.25, 0.9);
-        const gunMat = new THREE.MeshStandardMaterial({ color: 0x333333, roughness: 0.2 });
+        const gunMat = new THREE.MeshStandardMaterial({ color: 0x3d2314, roughness: 0.2 });
 
-        function createPlayerMesh(colorHex = '#e67e22') {
+        function createPlayerMesh(colorHex = '#d4a373') {
             const group = new THREE.Group();
             const bodyMat = new THREE.MeshStandardMaterial({ color: colorHex, roughness: 0.3 });
             const body = new THREE.Mesh(bodyGeo, bodyMat);
@@ -217,8 +218,8 @@
         });
 
         startBtn.addEventListener('click', () => {
-            const roomId = roomInput.value.trim() || '아레나1';
-            const nickname = nicknameInput.value.trim() || '용사';
+            const roomId = roomInput.value.trim() || '초코방1';
+            const nickname = nicknameInput.value.trim() || '초코총잡이';
             const selectedColor = colorInput.value;
             myNameTag.innerText = nickname;
 
@@ -246,7 +247,7 @@
             });
 
             socket.on('playerShooting', (data) => {
-                createVisualBullet(data.x, data.y, data.z, data.dirX, data.dirY, data.dirZ, 0xe74c3c);
+                createVisualBullet(data.x, data.y, data.z, data.dirX, data.dirY, data.dirZ, 0xffd166);
             });
 
             socket.on('updateStats', (players) => {
@@ -280,7 +281,7 @@
         });
 
         function addOtherPlayer(data) {
-            const mesh = createPlayerMesh(data.color || '#3498db');
+            const mesh = createPlayerMesh(data.color || '#b5651d');
             mesh.group.position.set(data.x, data.y, data.z);
             scene.add(mesh.group);
 
@@ -310,7 +311,7 @@
                 dirX: camDir.x, dirY: camDir.y, dirZ: camDir.z
             });
 
-            createVisualBullet(startPos.x, startPos.y, startPos.z, camDir.x, camDir.y, camDir.z, 0xf1c40f, true);
+            createVisualBullet(startPos.x, startPos.y, startPos.z, camDir.x, camDir.y, camDir.z, 0xffd166, true);
         }
 
         function createVisualBullet(x, y, z, dx, dy, dz, colorHex, isMine = false) {
@@ -378,7 +379,7 @@
                     myPlayer.body.position.y = 0.75;
                 }
 
-                // 핵심: 캐릭터가 카메라 방향(시점)을 바라보도록 회전
+                // 캐릭터가 카메라 방향(시점)을 바라보도록 회전
                 myPlayer.group.rotation.y = cameraAngleX;
 
                 socket.emit('playerUpdate', {
@@ -431,7 +432,7 @@
                 const playerCenter = myPlayer.group.position.clone().add(new THREE.Vector3(0, 1.2, 0));
                 
                 const dist = 5.0;
-                const shoulderOffset = -1.4; // 음수로 설정하여 카메라가 좌측으로 이동, 플레이어가 화면 우측에 위치
+                const shoulderOffset = -1.4; 
                 const heightOffset = 0.5;
 
                 const camPos = playerCenter.clone()
