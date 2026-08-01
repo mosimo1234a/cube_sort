@@ -194,14 +194,12 @@
         let cameraAngleX = 0;
         let cameraAngleY = 0.5;
 
-        // 화면 클릭 시 포인터 락 활성화 (마우스로 시점 자유 회전)
         renderer.domElement.addEventListener('click', () => {
             if (gameStarted && document.pointerLockElement !== renderer.domElement) {
                 renderer.domElement.requestPointerLock();
             }
         });
 
-        // 마우스 움직임으로 카메라 회전
         document.addEventListener('mousemove', (e) => {
             if (!gameStarted) return;
             if (document.pointerLockElement === renderer.domElement) {
@@ -210,7 +208,6 @@
             }
         });
 
-        // 좌클릭 시 총알 발사
         window.addEventListener('mousedown', (e) => {
             if (!gameStarted) return;
             if (e.button === 0) {
@@ -278,7 +275,6 @@
             myNameTag.style.display = 'block';
             gameStarted = true;
 
-            // 게임 시작 직후 포인터 락 요청
             renderer.domElement.requestPointerLock();
         });
 
@@ -419,15 +415,26 @@
                     }
                 }
 
-                // TPS 카메라 추적
+                // TPS 어깨너머(Over-The-Shoulder) 카메라 시점 적용
                 const pos = myPlayer.group.position;
-                const dist = 7;
-                const cx = pos.x + Math.sin(cameraAngleX) * dist * Math.cos(cameraAngleY);
-                const cy = pos.y + 2 + Math.sin(cameraAngleY) * dist;
-                const cz = pos.z + Math.cos(cameraAngleX) * dist * Math.cos(cameraAngleY);
+                const dist = 6;
+                const offsetX = Math.sin(cameraAngleX) * dist * Math.cos(cameraAngleY);
+                const offsetY = 2 + Math.sin(cameraAngleY) * dist;
+                const offsetZ = Math.cos(cameraAngleX) * dist * Math.cos(cameraAngleY);
 
-                camera.position.set(cx, cy, cz);
-                camera.lookAt(pos.x, pos.y + 1, pos.z);
+                // 카메라를 우측 어깨 방향으로 오프셋 주어 캐릭터가 조준점을 가리지 않게 함
+                const rightX = Math.cos(cameraAngleX);
+                const rightZ = -Math.sin(cameraAngleX);
+                const shoulderOffset = 1.2;
+
+                camera.position.set(
+                    pos.x + offsetX + rightX * shoulderOffset,
+                    pos.y + offsetY,
+                    pos.z + offsetZ + rightZ * shoulderOffset
+                );
+
+                const targetPos = pos.clone().add(new THREE.Vector3(0, 1.2, 0));
+                camera.lookAt(targetPos.add(new THREE.Vector3(rightX * shoulderOffset * 0.3, 0, rightZ * shoulderOffset * 0.3)));
 
                 updateTagPosition(myPlayer.group, myNameTag, 1.8);
                 Object.keys(otherPlayers).forEach(id => {
