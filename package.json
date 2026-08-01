@@ -1,13 +1,13 @@
 {
-  "name": "square-3d-multiplayer",
+  "name": "milk-choco-arena",
   "version": "1.0.0",
-  "description": "Render용 3D 네모 멀티플레이어 게임",
+  "description": "Milk Choco Arena TPS Multiplayer Game",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
   },
   "dependencies": {
     "express": "^4.18.2",
-    "socket.io": "^4.7.5"
+    "socket.io": "^4.7.2"
   }
 }
