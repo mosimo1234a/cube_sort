@@ -279,12 +279,12 @@
             }
         });
 
-        // 🔥 좌우만 반전하고 상하는 원래대로 유지
+        // 좌우 반전, 상하는 원상복구
         document.addEventListener('mousemove', (e) => {
             if (!gameStarted) return;
             if (document.pointerLockElement === renderer.domElement) {
                 cameraAngleX -= e.movementX * 0.003; // 좌우 반전
-                cameraAngleY -= e.movementY * 0.003; // 상하는 원래대로
+                cameraAngleY -= e.movementY * 0.003; // 상하 원상복구
                 cameraAngleY = Math.max(-1.2, Math.min(1.4, cameraAngleY));
             }
         });
@@ -443,6 +443,23 @@
             if (e.code === 'KeyS' || e.code === 'ArrowDown') keys.backward = false;
             if (e.code === 'KeyA' || e.code === 'ArrowLeft') keys.left = false;
             if (e.code === 'KeyD' || e.code === 'ArrowRight') keys.right = false;
+        });
+
+        // 🛡️ [버그 수정] 창 포커스 해제 또는 포인터 락이 풀릴 때 키 입력 상태 강제 초기화
+        window.addEventListener('blur', () => {
+            keys.forward = false;
+            keys.backward = false;
+            keys.left = false;
+            keys.right = false;
+        });
+
+        document.addEventListener('pointerlockchange', () => {
+            if (document.pointerLockElement !== renderer.domElement) {
+                keys.forward = false;
+                keys.backward = false;
+                keys.left = false;
+                keys.right = false;
+            }
         });
 
         const tempVector = new THREE.Vector3();
