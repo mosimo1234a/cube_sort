@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>밀크초코 아레나 TPS</title>
+    <title>밀크초코 아레나 TPS - 컴플리트 에디션</title>
     <style>
         body {
             margin: 0;
@@ -27,6 +27,40 @@
             padding: 12px 18px; border-radius: 12px; font-size: 14px; display: none; z-index: 5;
             border: 2px solid #d4a373; box-shadow: 0 4px 6px rgba(0,0,0,0.4); pointer-events: none;
         }
+        #kill-log {
+            position: absolute; top: 20px; right: 20px; width: 260px; pointer-events: none;
+            display: flex; flex-direction: column; gap: 6px; z-index: 5; align-items: flex-end;
+        }
+        .kill-log-item {
+            background: rgba(56, 31, 18, 0.8); color: #fff3e6; padding: 6px 12px; border-radius: 8px;
+            font-size: 12px; border: 1px solid #d4a373; box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+            animation: fadeInOut 4s forwards;
+        }
+        @keyframes fadeInOut {
+            0% { opacity: 0; transform: translateY(-10px); }
+            15% { opacity: 1; transform: translateY(0); }
+            85% { opacity: 1; transform: translateY(0); }
+            100% { opacity: 0; transform: translateY(-10px); display: none; }
+        }
+        #scoreboard {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            background: rgba(45, 27, 18, 0.95); border: 4px solid #d4a373; border-radius: 16px;
+            padding: 25px; width: 420px; color: #fff3e6; display: none; z-index: 20;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.8); pointer-events: none; text-align: center;
+        }
+        #scoreboard h3 { margin-top: 0; color: #ffa500; font-size: 20px; }
+        #scoreboard table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 14px; }
+        #scoreboard th, #scoreboard td { padding: 8px; border-bottom: 1px solid #5a3e2b; text-align: center; }
+        #scoreboard th { color: #d4a373; }
+        
+        #respawn-screen {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(26, 15, 10, 0.85); display: none; justify-content: center;
+            align-items: center; z-index: 15; flex-direction: column; color: #fff3e6;
+        }
+        #respawn-screen h1 { color: #e74c3c; font-size: 40px; margin-bottom: 10px; text-shadow: 0 4px 10px rgba(0,0,0,0.8); }
+        #respawn-screen p { font-size: 18px; color: #d4a373; }
+
         #instructions {
             position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
             color: #fff3e6; background: rgba(56, 31, 18, 0.85); padding: 10px 20px;
@@ -71,7 +105,7 @@
     <div id="start-screen">
         <div class="modal-box">
             <h2>🍫 밀크초코 아레나</h2>
-            <p>달콤한 초코 전장의 난투전!</p>
+            <p>컴플리트 에디션 (모든 기능 탑재)</p>
             <input type="text" id="room-input" value="초코방1" placeholder="방 이름">
             <input type="text" id="nickname-input" value="초코총잡이" maxlength="10" placeholder="닉네임">
             <div class="color-picker-wrapper">
@@ -84,9 +118,27 @@
 
     <div id="hit-overlay"></div>
     <div id="crosshair">+</div>
-    <div id="hud">내 체력: <span id="my-hp" style="color:#ffe600; font-weight:bold;">100</span> | 점수: <span id="my-score" style="color:#ffa500; font-weight:bold;">0</span> | 무기: <span id="my-weapon" style="color:#00ffff; font-weight:bold;">돌격소총 (1)</span></div>
+    <div id="kill-log"></div>
+    
+    <div id="scoreboard">
+        <h3>🏆 전장 순위표 (Tab)</h3>
+        <table>
+            <thead>
+                <tr><th>닉네임</th><th>점수</th><th>상태</th></tr>
+            </thead>
+            <tbody id="scoreboard-body"></tbody>
+        </table>
+    </div>
+
+    <div id="respawn-screen">
+        <h1>💀 전사했습니다</h1>
+        <p><span id="respawn-timer">3</span>초 후 부활합니다...</p>
+    </div>
+
+    <div id="hud">내 체력: <span id="my-hp" style="color:#ffe600; font-weight:bold;">100</span> | 점수: <span id="my-score" style="color:#ffa500; font-weight:bold;">0</span> | 무기: <span id="my-weapon" style="color:#00ffff; font-weight:bold;">돌격소총 (1)</span> | 탄약: <span id="my-ammo" style="color:#00ff88; font-weight:bold;">30/30</span></div>
+    
     <div id="instructions">
-        <strong>WASD</strong>: 이동 | <strong>SPACE</strong>: 점프 | <strong>1, 2, 3</strong>: 무기변경 | <strong>좌클릭</strong>: 발사
+        <strong>WASD</strong>: 이동 | <strong>SPACE</strong>: 점프 | <strong>1,2,3</strong>: 무기 | <strong>R</strong>: 재장전 | <strong>Tab</strong>: 순위표 | <strong>좌클릭</strong>: 발사
     </div>
     <div id="my-name-tag" class="name-tag my-tag"></div>
 
@@ -94,21 +146,79 @@
     <script src="/socket.io/socket.io.js"></script>
 
     <script>
+        // Web Audio API 효과음 시스템
+        let audioCtx = null;
+        function initAudio() {
+            if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+        }
+        function playSound(type) {
+            if (!audioCtx) return;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            const now = audioCtx.currentTime;
+
+            if (type === 'shoot') {
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(300, now);
+                osc.frequency.exponentialRampToValueAtTime(40, now + 0.1);
+                gain.gain.setValueAtTime(0.2, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+                osc.start(now); osc.stop(now + 0.1);
+            } else if (type === 'hit') {
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(150, now);
+                osc.frequency.exponentialRampToValueAtTime(60, now + 0.08);
+                gain.gain.setValueAtTime(0.2, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.08);
+                osc.start(now); osc.stop(now + 0.08);
+            } else if (type === 'jump') {
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(200, now);
+                osc.frequency.exponentialRampToValueAtTime(400, now + 0.15);
+                gain.gain.setValueAtTime(0.15, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
+                osc.start(now); osc.stop(now + 0.15);
+            } else if (type === 'reload') {
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(400, now);
+                osc.frequency.setValueAtTime(600, now + 0.2);
+                gain.gain.setValueAtTime(0.1, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+                osc.start(now); osc.stop(now + 0.3);
+            } else if (type === 'item') {
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(500, now);
+                osc.frequency.exponentialRampToValueAtTime(800, now + 0.2);
+                gain.gain.setValueAtTime(0.2, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
+                osc.start(now); osc.stop(now + 0.2);
+            }
+        }
+
         let gameStarted = false;
+        let isDead = false;
         let socket;
         let myHp = 100;
         let myScore = 0;
         const otherPlayers = {};
         const activeBullets = [];
+        const particles = [];
         const obstacleBounds = [];
+        const worldItems = [];
 
         const weapons = [
-            { id: 0, name: '돌격소총', cooldown: 160, pellets: 1, spread: 0.015, color: 0x3d2314 },
-            { id: 1, name: '샷건', cooldown: 550, pellets: 5, spread: 0.08, color: 0x8b0000 },
-            { id: 2, name: '저격총', cooldown: 900, pellets: 1, spread: 0.001, color: 0x1e3f66 }
+            { id: 0, name: '돌격소총', cooldown: 160, pellets: 1, spread: 0.015, color: 0x3d2314, maxAmmo: 30, reloadTime: 1200 },
+            { id: 1, name: '샷건', cooldown: 550, pellets: 5, spread: 0.08, color: 0x8b0000, maxAmmo: 8, reloadTime: 1500 },
+            { id: 2, name: '저격총', cooldown: 900, pellets: 1, spread: 0.001, color: 0x1e3f66, maxAmmo: 5, reloadTime: 1800 }
         ];
         let currentWeaponIdx = 0;
         let lastShootTime = 0;
+        let currentAmpos = [30, 8, 5];
+        let isReloading = false;
+        let gunRecoil = 0;
 
         const startScreen = document.getElementById('start-screen');
         const startBtn = document.getElementById('start-btn');
@@ -123,6 +233,12 @@
         const myHpSpan = document.getElementById('my-hp');
         const myScoreSpan = document.getElementById('my-score');
         const myWeaponSpan = document.getElementById('my-weapon');
+        const myAmmoSpan = document.getElementById('my-ammo');
+        const killLogContainer = document.getElementById('kill-log');
+        const scoreboard = document.getElementById('scoreboard');
+        const scoreboardBody = document.getElementById('scoreboard-body');
+        const respawnScreen = document.getElementById('respawn-screen');
+        const respawnTimerSpan = document.getElementById('respawn-timer');
 
         const scene = new THREE.Scene();
         scene.background = new THREE.Color(0x2d1b12);
@@ -140,6 +256,7 @@
         dirLight.castShadow = true;
         scene.add(dirLight);
 
+        // 바닥 및 벽
         const floor = new THREE.Mesh(
             new THREE.PlaneGeometry(60, 60),
             new THREE.MeshStandardMaterial({ color: 0x734a2e, roughness: 0.7 })
@@ -159,43 +276,36 @@
         });
 
         const obstacleMat = new THREE.MeshStandardMaterial({ color: 0xd4a373, roughness: 0.4 });
-        
-        const platformGeo = new THREE.BoxGeometry(10, 2.5, 10);
-        const platform = new THREE.Mesh(platformGeo, obstacleMat);
+        const platform = new THREE.Mesh(new THREE.BoxGeometry(10, 2.5, 10), obstacleMat);
         platform.position.set(0, 1.25, 0);
-        platform.castShadow = true;
-        platform.receiveShadow = true;
+        platform.castShadow = true; platform.receiveShadow = true;
         scene.add(platform);
         obstacleBounds.push({ minX: -5, maxX: 5, minZ: -5, maxZ: 5, maxY: 2.5 });
 
         const rampMat = new THREE.MeshStandardMaterial({ color: 0xb5651d, roughness: 0.5 });
         const rampGeo = new THREE.BoxGeometry(4, 0.4, 5.59);
-        
         const ramp1 = new THREE.Mesh(rampGeo, rampMat);
-        ramp1.position.set(0, 1.25, -7.5);
-        ramp1.rotation.x = -Math.atan(0.5);
-        scene.add(ramp1);
-
+        ramp1.position.set(0, 1.25, -7.5); ramp1.rotation.x = -Math.atan(0.5); scene.add(ramp1);
         const ramp2 = new THREE.Mesh(rampGeo, rampMat);
-        ramp2.position.set(0, 1.25, 7.5);
-        ramp2.rotation.x = Math.atan(0.5);
-        scene.add(ramp2);
+        ramp2.position.set(0, 1.25, 7.5); ramp2.rotation.x = Math.atan(0.5); scene.add(ramp2);
 
         const boxGeo = new THREE.BoxGeometry(4, 4, 4);
         [[ -15, -15 ], [ 15, 15 ], [ -15, 15 ], [ 15, -15 ], [ 0, -20 ], [ 0, 20 ]].forEach(pos => {
             const obs = new THREE.Mesh(boxGeo, obstacleMat);
             obs.position.set(pos[0], 2, pos[1]);
-            obs.castShadow = true;
-            obs.receiveShadow = true;
+            obs.castShadow = true; obs.receiveShadow = true;
             scene.add(obs);
+            obstacleBounds.push({ minX: pos[0] - 2, maxX: pos[0] + 2, minZ: pos[1] - 2, maxZ: pos[1] + 2, maxY: 4 });
+        });
 
-            obstacleBounds.push({
-                minX: pos[0] - 2,
-                maxX: pos[0] + 2,
-                minZ: pos[1] - 2,
-                maxZ: pos[1] + 2,
-                maxY: 4
-            });
+        // 🍫 아이템 스폰 (초코우유 팩)
+        const itemGeo = new THREE.BoxGeometry(1, 1, 1);
+        const itemMat = new THREE.MeshStandardMaterial({ color: 0xff6b81, emissive: 0xff4757, roughness: 0.2 });
+        [[10, 10], [-10, -10], [10, -10], [-10, 10]].forEach(pos => {
+            const itemMesh = new THREE.Mesh(itemGeo, itemMat);
+            itemMesh.position.set(pos[0], 0.5, pos[1]);
+            scene.add(itemMesh);
+            worldItems.push({ mesh: itemMesh, x: pos[0], z: pos[1], type: 'heal', active: true });
         });
 
         const bodyGeo = new THREE.BoxGeometry(1.5, 1.5, 1.5);
@@ -208,21 +318,15 @@
             const group = new THREE.Group();
             const bodyMat = new THREE.MeshStandardMaterial({ color: colorHex, roughness: 0.3 });
             const body = new THREE.Mesh(bodyGeo, bodyMat);
-            body.position.y = 0.75;
-            body.castShadow = true;
-            group.add(body);
+            body.position.y = 0.75; body.castShadow = true; group.add(body);
 
             const leftEye = new THREE.Mesh(eyeGeo, eyeMat);
-            leftEye.position.set(-0.35, 0.9, 0.77);
-            group.add(leftEye);
-
+            leftEye.position.set(-0.35, 0.9, 0.77); group.add(leftEye);
             const rightEye = new THREE.Mesh(eyeGeo, eyeMat);
-            rightEye.position.set(0.35, 0.9, 0.77);
-            group.add(rightEye);
+            rightEye.position.set(0.35, 0.9, 0.77); group.add(rightEye);
 
             const gun = new THREE.Mesh(gunGeo, gunMat);
-            gun.position.set(0.65, 0.6, 0.6);
-            group.add(gun);
+            gun.position.set(0.65, 0.6, 0.6); group.add(gun);
 
             return { group, body, gun };
         }
@@ -250,7 +354,6 @@
         function checkCollision(x, z) {
             if (x - playerRadius < -29.5 || x + playerRadius > 29.5) return true;
             if (z - playerRadius < -29.5 || z + playerRadius > 29.5) return true;
-
             for (let obs of obstacleBounds) {
                 if (obs.maxY === 2.5 && myPlayer.group.position.y < 2.0) {
                     if (x + playerRadius > obs.minX && x - playerRadius < obs.maxX && z + playerRadius > obs.minZ && z - playerRadius < obs.maxZ) return true;
@@ -261,46 +364,76 @@
             return false;
         }
 
-        function updateWeaponMesh() {
-            if (!myPlayer) return;
+        function updateWeaponHUD() {
             const wp = weapons[currentWeaponIdx];
             myPlayer.gun.material.color.setHex(wp.color);
-            
             if (currentWeaponIdx === 0) myPlayer.gun.scale.set(1, 1, 1);
             else if (currentWeaponIdx === 1) myPlayer.gun.scale.set(1.2, 1.2, 0.7);
             else if (currentWeaponIdx === 2) myPlayer.gun.scale.set(0.8, 0.8, 1.6);
 
             myWeaponSpan.innerText = `${wp.name} (${currentWeaponIdx + 1})`;
+            myAmmoSpan.innerText = `${currentAmpos[currentWeaponIdx]}/${wp.maxAmmo}`;
+        }
+
+        function addKillLog(killer, victim) {
+            const item = document.createElement('div');
+            item.className = 'kill-log-item';
+            item.innerHTML = `<strong>${killer}</strong> ➔ <strong>${victim}</strong>`;
+            killLogContainer.appendChild(item);
+            setTimeout(() => item.remove(), 4000);
         }
 
         renderer.domElement.addEventListener('click', () => {
-            if (gameStarted && document.pointerLockElement !== renderer.domElement) {
+            initAudio();
+            if (gameStarted && !isDead && document.pointerLockElement !== renderer.domElement) {
                 renderer.domElement.requestPointerLock();
             }
         });
 
-        // 좌우 반전, 상하는 원상복구
         document.addEventListener('mousemove', (e) => {
-            if (!gameStarted) return;
+            if (!gameStarted || isDead) return;
             if (document.pointerLockElement === renderer.domElement) {
-                cameraAngleX -= e.movementX * 0.003; // 좌우 반전
-                cameraAngleY -= e.movementY * 0.003; // 상하 원상복구
+                cameraAngleX -= e.movementX * 0.003;
+                cameraAngleY -= e.movementY * 0.003;
                 cameraAngleY = Math.max(-1.2, Math.min(1.4, cameraAngleY));
             }
         });
 
         window.addEventListener('mousedown', (e) => {
-            if (!gameStarted) return;
+            if (!gameStarted || isDead) return;
             if (e.button === 0) {
                 const now = Date.now();
                 const wp = weapons[currentWeaponIdx];
+                if (isReloading) return;
+                if (currentAmpos[currentWeaponIdx] <= 0) {
+                    startReload();
+                    return;
+                }
                 if (now - lastShootTime < wp.cooldown) return;
                 lastShootTime = now;
+                currentAmpos[currentWeaponIdx]--;
+                updateWeaponHUD();
+                gunRecoil = 0.25;
                 shootBullet(wp);
             }
         });
 
+        function startReload() {
+            if (isReloading) return;
+            const wp = weapons[currentWeaponIdx];
+            if (currentAmpos[currentWeaponIdx] === wp.maxAmmo) return;
+            isReloading = true;
+            playSound('reload');
+            myAmmoSpan.innerText = '재장전 중...';
+            setTimeout(() => {
+                currentAmpos[currentWeaponIdx] = wp.maxAmmo;
+                isReloading = false;
+                updateWeaponHUD();
+            }, wp.reloadTime);
+        }
+
         startBtn.addEventListener('click', () => {
+            initAudio();
             const roomId = roomInput.value.trim() || '초코방1';
             const nickname = nicknameInput.value.trim() || '초코총잡이';
             const selectedColor = colorInput.value;
@@ -308,7 +441,7 @@
 
             myPlayer = createPlayerMesh(selectedColor);
             scene.add(myPlayer.group);
-            updateWeaponMesh();
+            updateWeaponHUD();
 
             socket = io();
             socket.emit('joinRoom', { roomId, nickname, color: selectedColor });
@@ -319,9 +452,7 @@
                 });
             });
 
-            socket.on('newPlayer', (playerData) => {
-                addOtherPlayer(playerData);
-            });
+            socket.on('newPlayer', (playerData) => { addOtherPlayer(playerData); });
 
             socket.on('playerMoved', (playerData) => {
                 if (otherPlayers[playerData.id]) {
@@ -340,12 +471,22 @@
                     myScore = players[socket.id].score;
                     myHpSpan.innerText = myHp;
                     myScoreSpan.innerText = myScore;
+
+                    if (myHp <= 0 && !isDead) {
+                        triggerDeath();
+                    }
                 }
+                updateScoreboard(players);
             });
 
             socket.on('damaged', () => {
                 hitOverlay.style.opacity = '1';
+                playSound('hit');
                 setTimeout(() => { hitOverlay.style.opacity = '0'; }, 150);
+            });
+
+            socket.on('killMessage', (data) => {
+                addKillLog(data.killer, data.victim);
             });
 
             socket.on('playerDisconnected', (id) => {
@@ -366,6 +507,38 @@
             renderer.domElement.requestPointerLock();
         });
 
+        function triggerDeath() {
+            isDead = true;
+            if (document.pointerLockElement) document.exitPointerLock();
+            respawnScreen.style.display = 'flex';
+            let timeLeft = 3;
+            respawnTimerSpan.innerText = timeLeft;
+            const timerInterval = setInterval(() => {
+                timeLeft--;
+                respawnTimerSpan.innerText = timeLeft;
+                if (timeLeft <= 0) {
+                    clearInterval(timerInterval);
+                    respawnScreen.style.display = 'none';
+                    isDead = false;
+                    myHp = 100;
+                    myHpSpan.innerText = myHp;
+                    currentAmpos = [30, 8, 5];
+                    updateWeaponHUD();
+                    myPlayer.group.position.set((Math.random() - 0.5) * 20, 0, (Math.random() - 0.5) * 20);
+                    renderer.domElement.requestPointerLock();
+                }
+            }, 1000);
+        }
+
+        function updateScoreboard(players) {
+            scoreboardBody.innerHTML = '';
+            Object.values(players).sort((a, b) => b.score - a.score).forEach(p => {
+                const row = document.createElement('tr');
+                row.innerHTML = `<td>${p.nickname}</td><td>${p.score}</td><td>${p.hp > 0 ? '생존' : '사망'}</td>`;
+                scoreboardBody.appendChild(row);
+            });
+        }
+
         function addOtherPlayer(data) {
             const mesh = createPlayerMesh(data.color || '#b5651d');
             mesh.group.position.set(data.x, data.y, data.z);
@@ -380,9 +553,11 @@
         }
 
         const bulletGeo = new THREE.SphereGeometry(0.22, 8, 8);
-        
+        const particleGeo = new THREE.BoxGeometry(0.12, 0.12, 0.12);
+
         function shootBullet(wp) {
             if (!myPlayer) return;
+            playSound('shoot');
 
             const cosY = Math.cos(cameraAngleY);
             const sinY = Math.sin(cameraAngleY);
@@ -422,8 +597,22 @@
             });
         }
 
+        function spawnHitSparks(pos) {
+            for (let i = 0; i < 5; i++) {
+                const mat = new THREE.MeshBasicMaterial({ color: 0xffd166 });
+                const pMesh = new THREE.Mesh(particleGeo, mat);
+                pMesh.position.copy(pos);
+                scene.add(pMesh);
+                particles.push({
+                    mesh: pMesh,
+                    dir: new THREE.Vector3((Math.random()-0.5)*0.2, Math.random()*0.2, (Math.random()-0.5)*0.2),
+                    life: 20
+                });
+            }
+        }
+
         window.addEventListener('keydown', (e) => {
-            if (!gameStarted) return;
+            if (!gameStarted || isDead) return;
             if (e.code === 'KeyW' || e.code === 'ArrowUp') keys.forward = true;
             if (e.code === 'KeyS' || e.code === 'ArrowDown') keys.backward = true;
             if (e.code === 'KeyA' || e.code === 'ArrowLeft') keys.left = true;
@@ -431,10 +620,16 @@
             if (e.code === 'Space' && isGrounded) {
                 playerVelocity.y = jumpForce;
                 isGrounded = false;
+                playSound('jump');
             }
-            if (e.code === 'Digit1') { currentWeaponIdx = 0; updateWeaponMesh(); }
-            if (e.code === 'Digit2') { currentWeaponIdx = 1; updateWeaponMesh(); }
-            if (e.code === 'Digit3') { currentWeaponIdx = 2; updateWeaponMesh(); }
+            if (e.code === 'Digit1') { currentWeaponIdx = 0; updateWeaponHUD(); }
+            if (e.code === 'Digit2') { currentWeaponIdx = 1; updateWeaponHUD(); }
+            if (e.code === 'Digit3') { currentWeaponIdx = 2; updateWeaponHUD(); }
+            if (e.code === 'KeyR') { startReload(); }
+            if (e.code === 'Tab') {
+                e.preventDefault();
+                scoreboard.style.display = 'block';
+            }
         });
 
         window.addEventListener('keyup', (e) => {
@@ -443,22 +638,18 @@
             if (e.code === 'KeyS' || e.code === 'ArrowDown') keys.backward = false;
             if (e.code === 'KeyA' || e.code === 'ArrowLeft') keys.left = false;
             if (e.code === 'KeyD' || e.code === 'ArrowRight') keys.right = false;
+            if (e.code === 'Tab') {
+                scoreboard.style.display = 'none';
+            }
         });
 
-        // 🛡️ [버그 수정] 창 포커스 해제 또는 포인터 락이 풀릴 때 키 입력 상태 강제 초기화
         window.addEventListener('blur', () => {
-            keys.forward = false;
-            keys.backward = false;
-            keys.left = false;
-            keys.right = false;
+            keys.forward = false; keys.backward = false; keys.left = false; keys.right = false;
         });
 
         document.addEventListener('pointerlockchange', () => {
-            if (document.pointerLockElement !== renderer.domElement) {
-                keys.forward = false;
-                keys.backward = false;
-                keys.left = false;
-                keys.right = false;
+            if (document.pointerLockElement !== renderer.domElement && !isDead) {
+                keys.forward = false; keys.backward = false; keys.left = false; keys.right = false;
             }
         });
 
@@ -470,7 +661,7 @@
         function animate() {
             requestAnimationFrame(animate);
 
-            if (gameStarted && myPlayer) {
+            if (gameStarted && myPlayer && !isDead) {
                 forwardVector.set(Math.sin(cameraAngleX), 0, Math.cos(cameraAngleX)).normalize();
                 rightVector.set(Math.cos(cameraAngleX), 0, -Math.sin(cameraAngleX)).normalize();
 
@@ -511,6 +702,25 @@
                     }
                 }
 
+                // 아이템 습득 체크
+                worldItems.forEach(item => {
+                    if (item.active) {
+                        const dist = Math.hypot(myPlayer.group.position.x - item.x, myPlayer.group.position.z - item.z);
+                        if (dist < 1.5 && myHp < 100) {
+                            item.active = false;
+                            item.mesh.visible = false;
+                            playSound('item');
+                            socket.emit('heal', 30); // 서버 연동용 또는 로컬 회복
+                            myHp = Math.min(100, myHp + 30);
+                            myHpSpan.innerText = myHp;
+                            setTimeout(() => {
+                                item.active = true;
+                                item.mesh.visible = true;
+                            }, 10000); // 10초 뒤 리스폰
+                        }
+                    }
+                });
+
                 socket.emit('playerUpdate', {
                     x: myPlayer.group.position.x,
                     y: myPlayer.group.position.y,
@@ -528,6 +738,7 @@
                             const op = otherPlayers[id].group;
                             if (op && b.mesh.position.distanceTo(op.position) < 1.5) {
                                 socket.emit('hitPlayer', id);
+                                spawnHitSparks(b.mesh.position);
                                 b.life = 0;
                             }
                         });
@@ -537,6 +748,24 @@
                         scene.remove(b.mesh);
                         activeBullets.splice(i, 1);
                     }
+                }
+
+                for (let i = particles.length - 1; i >= 0; i--) {
+                    const p = particles[i];
+                    p.mesh.position.add(p.dir);
+                    p.life--;
+                    if (p.life <= 0) {
+                        scene.remove(p.mesh);
+                        particles.splice(i, 1);
+                    }
+                }
+
+                // 총기 반동 복원
+                if (gunRecoil > 0) {
+                    gunRecoil -= 0.03;
+                    myPlayer.gun.position.z = 0.6 + gunRecoil;
+                } else {
+                    myPlayer.gun.position.z = 0.6;
                 }
 
                 const cosY = Math.cos(cameraAngleY);
@@ -549,10 +778,7 @@
                 const camRight = new THREE.Vector3().crossVectors(camDir, worldUp).normalize();
 
                 const playerCenter = myPlayer.group.position.clone().add(new THREE.Vector3(0, 1.2, 0));
-                
-                const dist = 5.0;
-                const shoulderOffset = -1.4; 
-                const heightOffset = 0.5;
+                const dist = 5.0, shoulderOffset = -1.4, heightOffset = 0.5;
 
                 const camPos = playerCenter.clone()
                     .sub(camDir.clone().multiplyScalar(dist))
