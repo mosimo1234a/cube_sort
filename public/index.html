@@ -279,12 +279,12 @@
             }
         });
 
-        // 🔥 마우스 시점 반전 방향 수정 완료 (마우스 이동 방향과 시점이 올바르게 연동됨)
+        // 🔥 좌우만 반전하고 상하는 원래대로 유지
         document.addEventListener('mousemove', (e) => {
             if (!gameStarted) return;
             if (document.pointerLockElement === renderer.domElement) {
-                cameraAngleX -= e.movementX * 0.003;
-                cameraAngleY += e.movementY * 0.003;
+                cameraAngleX -= e.movementX * 0.003; // 좌우 반전
+                cameraAngleY -= e.movementY * 0.003; // 상하는 원래대로
                 cameraAngleY = Math.max(-1.2, Math.min(1.4, cameraAngleY));
             }
         });
